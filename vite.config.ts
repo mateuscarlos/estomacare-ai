@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
               'charts': ['recharts'],
               'ai': ['@google/genai'],
               'pdf': ['jspdf', 'jspdf-autotable'],
-              'firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage']
+              'firebase': ['firebase']
             }
           }
         },

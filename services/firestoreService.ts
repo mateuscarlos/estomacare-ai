@@ -175,12 +175,8 @@ export const createLesion = async (patientId: string, lesionData: Omit<Lesion, '
     
     const createdLesion: Lesion = {
       id: docRef.id,
-      patientId: patientId,
-      type: lesionData.type,
-      location: lesionData.location,
-      startDate: lesionData.startDate,
-      previousTreatments: lesionData.previousTreatments,
-      assessments: lesionData.assessments
+      patientId,
+      ...lesionData
     };
     
     return createdLesion;

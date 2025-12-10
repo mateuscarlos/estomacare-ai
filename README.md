@@ -117,7 +117,7 @@ estomacare-ai/
 ✅ **Autenticação robusta** via Firebase Auth  
 ✅ **Regras Firestore** - Usuários só acessam seus dados  
 ✅ **HTTPS obrigatório** em todas as conexões  
-✅ **Conformidade LGPG/HIPAA** - Dados médicos protegidos
+✅ **Conformidade LGPD/HIPAA** - Dados médicos protegidos
 
 ## 💰 Custo Estimado (Firebase Blaze Plan)
 
