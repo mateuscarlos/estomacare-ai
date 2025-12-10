@@ -1,0 +1,7 @@
+{
+  "name": "EstomaCare AI",
+  "description": "Plataforma inteligente para estomaterapeutas gerenciarem pacientes, monitorarem lesões e receberem sugestões de tratamento via IA.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
