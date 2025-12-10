@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Activity, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authService } from '../services/authService';
+import { authService } from '../services/firebaseAuthService';
 import { User } from '../types';
 
 interface RegisterProps {
