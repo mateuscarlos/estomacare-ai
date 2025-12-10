@@ -7,39 +7,49 @@ import PatientDetail from './components/PatientDetail';
 import Login from './components/Login';
 import Register from './components/Register';
 import { generateMockPatients, Patient, User } from './types';
-import { authService } from './services/authService';
+import { authService } from './services/firebaseAuthService';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize Data
+  // Initialize Data and setup auth listener
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    setUser(currentUser);
-    
-    // In a real app, we would fetch patients from API filtered by user ID.
-    // Here we generate mock patients, and if a user exists, we assign them to that user 
-    // to simulate existing data.
-    if (currentUser) {
+    // Subscribe to auth state changes
+    const unsubscribe = authService.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+      
+      if (currentUser) {
+        // In a real app, fetch patients from Firestore filtered by user ID
+        // For now, generate mock patients
         setPatients(generateMockPatients(currentUser.id));
-    }
+      } else {
+        setPatients([]);
+      }
+      
+      setIsLoading(false);
+    });
     
-    setIsLoading(false);
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
   }, []);
 
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
-    // Reload "mock" patients for this new user so dashboard isn't empty
+    // Reload "mock" patients for this new user
     // In production this would be an API call: fetchPatients(userId)
     setPatients(generateMockPatients(loggedInUser.id));
   };
 
-  const handleLogout = () => {
-    authService.logout();
-    setUser(null);
-    setPatients([]);
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      setUser(null);
+      setPatients([]);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const addPatient = (newPatient: Patient) => {

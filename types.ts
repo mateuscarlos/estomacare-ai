@@ -67,6 +67,7 @@ export interface Assessment {
 
 export interface Lesion {
   id: string;
+  patientId: string; // Foreign Key to Patient
   type: LesionType;
   location: string;
   startDate: string;
