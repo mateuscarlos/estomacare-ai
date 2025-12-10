@@ -20,8 +20,7 @@ export default defineConfig(({ mode }) => {
               'react-vendor': ['react', 'react-dom', 'react-router-dom'],
               'charts': ['recharts'],
               'ai': ['@google/genai'],
-              'pdf': ['jspdf', 'jspdf-autotable'],
-              'firebase': ['firebase']
+              'pdf': ['jspdf', 'jspdf-autotable']
             }
           }
         },
