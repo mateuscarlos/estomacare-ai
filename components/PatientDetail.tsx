@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Plus, Brain, Calendar, Activity, 
@@ -10,8 +10,9 @@ import {
   Patient, Lesion, Assessment, ExudateLevel, ExudateType, 
   TissuePercentage, LesionType
 } from '../types';
-import { getTreatmentSuggestion, analyzeWoundImage } from '../services/geminiService';
+import { getTreatmentSuggestion, analyzeWoundImage } from '../services/firebaseGeminiService';
 import { generateLesionPDF } from '../services/pdfService';
+import { getPatientLesions, createLesion, updateLesion, deleteLesion } from '../services/firestoreService';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
@@ -27,9 +28,11 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
   const navigate = useNavigate();
   const patient = patients.find(p => p.id === id);
 
-  const [activeLesionId, setActiveLesionId] = useState<string | null>(
-    patient?.lesions[0]?.id || null
-  );
+  // State for lesions from separate collection
+  const [lesions, setLesions] = useState<Lesion[]>([]);
+  const [loadingLesions, setLoadingLesions] = useState(true);
+  
+  const [activeLesionId, setActiveLesionId] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
   // State for new assessment form
@@ -75,9 +78,36 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
 
   const [newAssessment, setNewAssessment] = useState<Partial<Assessment>>(initialAssessmentState);
 
+  // Load lesions from Firestore when patient changes
+  useEffect(() => {
+    if (patient) {
+      loadLesions();
+    }
+  }, [patient?.id]);
+
+  const loadLesions = async () => {
+    if (!patient) return;
+    
+    try {
+      setLoadingLesions(true);
+      const patientLesions = await getPatientLesions(patient.id);
+      setLesions(patientLesions);
+      
+      // Set active lesion to first one if none selected
+      if (!activeLesionId && patientLesions.length > 0) {
+        setActiveLesionId(patientLesions[0].id);
+      }
+    } catch (error) {
+      console.error('Error loading lesions:', error);
+      alert('Erro ao carregar lesões');
+    } finally {
+      setLoadingLesions(false);
+    }
+  };
+
   if (!patient) return <div>Paciente não encontrado</div>;
 
-  const activeLesion = patient.lesions.find(l => l.id === activeLesionId);
+  const activeLesion = lesions.find(l => l.id === activeLesionId);
 
   // Filter assessments that have AI suggestions for the consolidated history view
   const assessmentsWithSuggestions = activeLesion 
@@ -102,20 +132,19 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
       
       const suggestion = await getTreatmentSuggestion(lesion, lastAssessment, patientContext);
       
-      const updatedLesion = { ...lesion };
       const updatedAssessments = [...lesion.assessments];
       updatedAssessments[updatedAssessments.length - 1] = {
         ...lastAssessment,
         aiSuggestion: suggestion
       };
-      updatedLesion.assessments = updatedAssessments;
 
-      const updatedPatient = {
-        ...patient,
-        lesions: patient.lesions.map(l => l.id === lesion.id ? updatedLesion : l)
-      };
-
-      onUpdatePatient(updatedPatient);
+      // Update lesion in Firestore
+      await updateLesion(lesion.id, {
+        assessments: updatedAssessments
+      });
+      
+      // Update local state
+      setLesions(lesions.map(l => l.id === lesion.id ? {...l, assessments: updatedAssessments} : l));
     } catch (error) {
       console.error(error);
       alert("Erro ao conectar com a IA. Verifique sua chave API.");
@@ -181,7 +210,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
     }));
   };
 
-  const handleAddAssessment = () => {
+  const handleAddAssessment = async () => {
     if (!activeLesion) return;
 
     const assessment: Assessment = {
@@ -202,22 +231,26 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
         imageUrl: newAssessment.imageUrl
     };
 
-    const updatedLesion = {
-        ...activeLesion,
-        assessments: [...activeLesion.assessments, assessment]
-    };
+    const updatedAssessments = [...activeLesion.assessments, assessment];
 
-    const updatedPatient = {
-        ...patient,
-        lesions: patient.lesions.map(l => l.id === activeLesion.id ? updatedLesion : l)
-    };
-
-    onUpdatePatient(updatedPatient);
-    setShowForm(false);
-    setNewAssessment(initialAssessmentState);
+    try {
+      // Update lesion in Firestore
+      await updateLesion(activeLesion.id, {
+        assessments: updatedAssessments
+      });
+      
+      // Update local state
+      setLesions(lesions.map(l => l.id === activeLesion.id ? {...l, assessments: updatedAssessments} : l));
+      
+      setShowForm(false);
+      setNewAssessment(initialAssessmentState);
+    } catch (error) {
+      console.error('Error adding assessment:', error);
+      alert('Erro ao adicionar avaliação');
+    }
   };
 
-  const handleSaveNewLesion = () => {
+  const handleSaveNewLesion = async () => {
       if (!newLesionData.location) {
           alert("Por favor, informe a localização da lesão.");
           return;
@@ -228,29 +261,30 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
           .map(t => t.trim())
           .filter(t => t.length > 0);
 
-      const newLesion: Lesion = {
-          id: Date.now().toString(),
+      try {
+        // Create lesion in Firestore
+        const createdLesion = await createLesion(patient.id, {
           type: newLesionData.type,
           location: newLesionData.location,
           startDate: newLesionData.startDate,
           previousTreatments: treatmentsArray,
           assessments: []
-      };
-
-      const updatedPatient = {
-          ...patient,
-          lesions: [...patient.lesions, newLesion]
-      };
-
-      onUpdatePatient(updatedPatient);
-      setActiveLesionId(newLesion.id);
-      setShowAddLesionModal(false);
-      setNewLesionData({
-          type: LesionType.PRESSURE_ULCER,
-          location: '',
-          startDate: new Date().toISOString().split('T')[0],
-          previousTreatments: ''
-      });
+        });
+        
+        // Update local state
+        setLesions([...lesions, createdLesion]);
+        setActiveLesionId(createdLesion.id);
+        setShowAddLesionModal(false);
+        setNewLesionData({
+            type: LesionType.PRESSURE_ULCER,
+            location: '',
+            startDate: new Date().toISOString().split('T')[0],
+            previousTreatments: ''
+        });
+      } catch (error) {
+        console.error('Error creating lesion:', error);
+        alert('Erro ao criar lesão: ' + (error as Error).message);
+      }
   };
 
   const handleExportPDF = () => {
@@ -325,20 +359,29 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
             </button>
           </div>
           <div className="space-y-2">
-            {patient.lesions.map(lesion => (
-              <button
-                key={lesion.id}
-                onClick={() => setActiveLesionId(lesion.id)}
-                className={`w-full text-left p-3 rounded-lg border transition-all ${
-                  activeLesionId === lesion.id 
-                    ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500' 
-                    : 'border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <p className="font-medium text-gray-900 text-sm">{lesion.type}</p>
-                <p className="text-xs text-gray-500 truncate">{lesion.location}</p>
-              </button>
-            ))}
+            {loadingLesions ? (
+              <div className="text-center py-4 text-gray-500">
+                <Loader2 className="animate-spin mx-auto" size={24} />
+                <p className="text-sm mt-2">Carregando lesões...</p>
+              </div>
+            ) : lesions.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-4">Nenhuma lesão cadastrada</p>
+            ) : (
+              lesions.map(lesion => (
+                <button
+                  key={lesion.id}
+                  onClick={() => setActiveLesionId(lesion.id)}
+                  className={`w-full text-left p-3 rounded-lg border transition-all ${
+                    activeLesionId === lesion.id 
+                      ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500' 
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <p className="font-medium text-gray-900 text-sm">{lesion.type}</p>
+                  <p className="text-xs text-gray-500 truncate">{lesion.location}</p>
+                </button>
+              ))
+            )}
           </div>
         </div>
 

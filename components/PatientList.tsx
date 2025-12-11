@@ -34,7 +34,6 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onAddPatient }) => 
               nutritionalStatus: 'Bom',
               mobility: 'Boa',
               comorbidities: [],
-              lesions: [],
               photoUrl: `https://picsum.photos/id/${Number(newId) + 50}/200/200`
             });
           }}
@@ -86,7 +85,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onAddPatient }) => 
                     <span>•</span>
                     <span>{patient.age} anos</span>
                     <span>•</span>
-                    <span>{patient.lesions.length} lesões ativas</span>
+                    <span>{patient.gender}</span>
                   </div>
                 </div>
               </div>

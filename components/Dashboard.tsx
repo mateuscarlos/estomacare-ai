@@ -17,13 +17,9 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, onAddPatient }) => {
 
   // Stats Logic
   const totalPatients = patients.length;
-  const totalLesions = patients.reduce((acc, p) => acc + p.lesions.length, 0);
-  const activeAlerts = patients.reduce((acc, p) => 
-    acc + p.lesions.filter(l => {
-      const lastAssessment = l.assessments[l.assessments.length - 1];
-      return lastAssessment.painLevel > 7 || (lastAssessment.tissueTypes?.necrotic || 0) > 20;
-    }).length
-  , 0);
+  // TODO: Implement totalLesions and activeAlerts by querying lesions collection
+  const totalLesions = 0; // Will be implemented with separate query
+  const activeAlerts = 0; // Will be implemented with separate query
 
   // Search Logic
   const filteredPatients = patients.filter(p => 
@@ -137,8 +133,8 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, onAddPatient }) => {
                       <span className="bg-gray-100 px-1.5 rounded text-xs font-medium text-gray-600">ID: {patient.id}</span>
                       <span>{patient.age} anos</span>
                       <span>•</span>
-                      <span className={`${patient.lesions.length > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                        {patient.lesions.length > 0 ? `${patient.lesions.length} lesões ativas` : 'Alta médica'}
+                      <span className="text-gray-600">
+                        {patient.age} anos • {patient.gender}
                       </span>
                     </div>
                   </div>

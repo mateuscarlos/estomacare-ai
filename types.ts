@@ -105,7 +105,6 @@ export interface Patient {
   comorbidities: string[];
   medications?: string;
   
-  lesions: Lesion[];
   photoUrl: string;
 }
 
@@ -126,33 +125,7 @@ export const generateMockPatients = (userId: string = 'user1'): Patient[] => [
     alcohol: false,
     allergies: ['Látex', 'Sulfa'],
     comorbidities: ['Diabetes Tipo 2', 'Hipertensão'],
-    photoUrl: 'https://picsum.photos/id/64/200/200',
-    lesions: [
-      {
-        id: 'l1',
-        type: LesionType.DIABETIC_FOOT,
-        location: 'Pé Esquerdo - Região Plantar',
-        startDate: '2023-11-15',
-        previousTreatments: ['Hidrogel com Alginato', 'Colagenase'],
-        assessments: [
-          {
-            id: 'a1',
-            date: '2023-11-15',
-            widthMm: 45,
-            heightMm: 30,
-            depthMm: 5,
-            exudate: ExudateLevel.MODERATE,
-            exudateType: ExudateType.SEROUS,
-            tissueTypes: { necrotic: 0, slough: 40, granulation: 60, epithelialization: 0 },
-            infectionSigns: ['Calor local'],
-            woundEdges: ['Maceração'],
-            periwoundSkin: ['Xerose'],
-            painLevel: 4,
-            notes: 'Início do tratamento. Tecido desvitalizado presente.',
-          }
-        ]
-      }
-    ]
+    photoUrl: 'https://picsum.photos/id/64/200/200'
   },
   {
     id: '2',
@@ -170,32 +143,6 @@ export const generateMockPatients = (userId: string = 'user1'): Patient[] => [
     alcoholAmount: '5 latas/semana',
     allergies: [],
     comorbidities: ['Insuficiência Venosa'],
-    photoUrl: 'https://picsum.photos/id/91/200/200',
-    lesions: [
-      {
-        id: 'l2',
-        type: LesionType.VENOUS_ULCER,
-        location: 'Perna Direita - Maleolo Medial',
-        startDate: '2024-01-10',
-        previousTreatments: ['Bota de Unna', 'Espuma de Poliuretano'],
-        assessments: [
-          {
-            id: 'a3',
-            date: '2024-01-10',
-            widthMm: 60,
-            heightMm: 55,
-            depthMm: 2,
-            exudate: ExudateLevel.HIGH,
-            exudateType: ExudateType.SEROSANGUINEOUS,
-            tissueTypes: { necrotic: 0, slough: 10, granulation: 90, epithelialization: 0 },
-            infectionSigns: ['Edema', 'Eritema'],
-            woundEdges: [],
-            periwoundSkin: ['Eczema'],
-            painLevel: 6,
-            notes: 'Edema importante em membro inferior.',
-          }
-        ]
-      }
-    ]
+    photoUrl: 'https://picsum.photos/id/91/200/200'
   }
 ];

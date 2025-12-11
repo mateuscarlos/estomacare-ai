@@ -31,9 +31,25 @@ export const getUserPatients = async (userId: string): Promise<Patient[]> => {
     const patients: Patient[] = [];
     
     querySnapshot.forEach((doc) => {
+      const data = doc.data();
       patients.push({
         id: doc.id,
-        ...doc.data()
+        userId: data.userId,
+        name: data.name,
+        age: data.age,
+        gender: data.gender,
+        weightKg: data.weightKg,
+        address: data.address,
+        nutritionalStatus: data.nutritionalStatus,
+        mobility: data.mobility,
+        smoker: data.smoker,
+        smokerAmount: data.smokerAmount,
+        alcohol: data.alcohol,
+        alcoholAmount: data.alcoholAmount,
+        comorbidities: data.comorbidities || [],
+        allergies: data.allergies || [],
+        medications: data.medications,
+        photoUrl: data.photoUrl
       } as Patient);
     });
     
@@ -72,8 +88,12 @@ export const getPatient = async (patientId: string): Promise<Patient | null> => 
 export const createPatient = async (userId: string, patientData: Omit<Patient, 'id' | 'userId'>): Promise<Patient> => {
   try {
     const patientsRef = collection(db, 'patients');
+    // Remove userId from patientData if it exists (shouldn't per type, but just in case)
+    const { userId: _, ...cleanPatientData } = patientData as any;
+    // Ensure no lesions field is included
+    const { lesions: __, ...dataWithoutLesions } = cleanPatientData as any;
     const newPatient = {
-      ...patientData,
+      ...dataWithoutLesions,
       userId,
       createdAt: Timestamp.now().toMillis(),
       updatedAt: Timestamp.now().toMillis()
@@ -98,13 +118,27 @@ export const createPatient = async (userId: string, patientData: Omit<Patient, '
 export const updatePatient = async (patientId: string, patientData: Partial<Patient>): Promise<void> => {
   try {
     const patientRef = doc(db, 'patients', patientId);
+    
+    // Remove id, userId, and lesions from patientData - these fields should never be updated
+    const { id, userId, lesions, ...restData } = patientData as any;
+    
+    // Deep clone via JSON to ensure everything is serializable
+    const cleanData = JSON.parse(JSON.stringify(restData));
+    
+    console.log('Updating patient in Firestore:', {
+      patientId,
+      fieldsToUpdate: Object.keys(cleanData)
+    });
+    
     await updateDoc(patientRef, {
-      ...patientData,
+      ...cleanData,
       updatedAt: Timestamp.now().toMillis()
     });
+    
+    console.log('Patient updated successfully');
   } catch (error) {
     console.error('Error updating patient:', error);
-    throw new Error('Erro ao atualizar paciente');
+    throw error;
   }
 };
 
@@ -192,8 +226,12 @@ export const createLesion = async (patientId: string, lesionData: Omit<Lesion, '
 export const updateLesion = async (lesionId: string, lesionData: Partial<Lesion>): Promise<void> => {
   try {
     const lesionRef = doc(db, 'lesions', lesionId);
+    // Remove id and patientId from updates
+    const { id, patientId, ...cleanData } = lesionData;
+    const serializedData = JSON.parse(JSON.stringify(cleanData));
+    
     await updateDoc(lesionRef, {
-      ...lesionData,
+      ...serializedData,
       updatedAt: Timestamp.now().toMillis()
     });
   } catch (error) {

@@ -55,8 +55,7 @@ const PatientFormModal: React.FC<PatientFormModalProps> = ({ isOpen, onClose, on
         alcoholAmount: '',
         comorbidities: [],
         allergies: [],
-        medications: '',
-        lesions: []
+        medications: ''
       });
       setComorbiditiesStr('');
       setAllergiesStr('');
@@ -98,7 +97,6 @@ const PatientFormModal: React.FC<PatientFormModalProps> = ({ isOpen, onClose, on
       comorbidities: processedComorbidities,
       allergies: processedAllergies,
       medications: formData.medications,
-      lesions: initialData?.lesions || [],
       photoUrl: formData.photoUrl || `https://ui-avatars.com/api/?name=${formData.name}&background=random`
     };
 

@@ -6,8 +6,9 @@ import Dashboard from './components/Dashboard';
 import PatientDetail from './components/PatientDetail';
 import Login from './components/Login';
 import Register from './components/Register';
-import { generateMockPatients, Patient, User } from './types';
+import { Patient, User } from './types';
 import { authService } from './services/firebaseAuthService';
+import { getUserPatients, createPatient, updatePatient as updatePatientInDb } from './services/firestoreService';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -17,13 +18,18 @@ const App: React.FC = () => {
   // Initialize Data and setup auth listener
   useEffect(() => {
     // Subscribe to auth state changes
-    const unsubscribe = authService.onAuthStateChanged((currentUser) => {
+    const unsubscribe = authService.onAuthStateChanged(async (currentUser) => {
       setUser(currentUser);
       
       if (currentUser) {
-        // In a real app, fetch patients from Firestore filtered by user ID
-        // For now, generate mock patients
-        setPatients(generateMockPatients(currentUser.id));
+        try {
+          // Fetch real patients from Firestore
+          const userPatients = await getUserPatients(currentUser.id);
+          setPatients(userPatients);
+        } catch (error) {
+          console.error('Error loading patients:', error);
+          setPatients([]);
+        }
       } else {
         setPatients([]);
       }
@@ -35,11 +41,16 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = (loggedInUser: User) => {
+  const handleLogin = async (loggedInUser: User) => {
     setUser(loggedInUser);
-    // Reload "mock" patients for this new user
-    // In production this would be an API call: fetchPatients(userId)
-    setPatients(generateMockPatients(loggedInUser.id));
+    try {
+      // Load real patients from Firestore
+      const userPatients = await getUserPatients(loggedInUser.id);
+      setPatients(userPatients);
+    } catch (error) {
+      console.error('Error loading patients:', error);
+      setPatients([]);
+    }
   };
 
   const handleLogout = async () => {
@@ -52,15 +63,30 @@ const App: React.FC = () => {
     }
   };
 
-  const addPatient = (newPatient: Patient) => {
+  const addPatient = async (newPatient: Patient) => {
     if (!user) return;
-    // Ensure patient is linked to current user
-    const patientWithUser = { ...newPatient, userId: user.id };
-    setPatients([...patients, patientWithUser]);
+    try {
+      // Create patient in Firestore
+      const createdPatient = await createPatient(user.id, newPatient);
+      setPatients([...patients, createdPatient]);
+    } catch (error) {
+      console.error('Error creating patient:', error);
+      alert('Erro ao criar paciente. Verifique as permissões.');
+    }
   };
 
-  const updatePatient = (updatedPatient: Patient) => {
-    setPatients(patients.map(p => p.id === updatedPatient.id ? updatedPatient : p));
+  const updatePatient = async (updatedPatient: Patient) => {
+    if (!user) return;
+    
+    try {
+      console.log('Updating patient:', updatedPatient.id);
+      
+      await updatePatientInDb(updatedPatient.id, updatedPatient);
+      setPatients(patients.map(p => p.id === updatedPatient.id ? updatedPatient : p));
+    } catch (error) {
+      console.error('Error updating patient:', error);
+      alert('Erro ao atualizar paciente: ' + (error as Error).message);
+    }
   };
 
   // Filter patients by current user ID for security/logic
