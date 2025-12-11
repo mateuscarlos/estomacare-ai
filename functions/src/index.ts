@@ -2,6 +2,8 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, Type, Schema } from '@google/genai';
 import { defineSecret } from 'firebase-functions/params';
+import { rateLimiter } from './middleware/rateLimiter';
+import { monitoringLogger } from './utils/monitoring';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -92,8 +94,15 @@ const imageAnalysisSchema: Schema = {
  * }
  */
 export const getTreatmentSuggestion = onCall(
-  { secrets: [geminiApiKeySecret] },
+  { 
+    secrets: [geminiApiKeySecret],
+    maxInstances: 10,
+    timeoutSeconds: 60,
+    memory: '512MiB'
+  },
   async (request) => {
+    const startTime = Date.now();
+    
     // Verify user is authenticated
     if (!request.auth) {
       throw new HttpsError(
@@ -101,6 +110,12 @@ export const getTreatmentSuggestion = onCall(
         'User must be authenticated to get treatment suggestions'
       );
     }
+
+    const userId = request.auth.uid;
+
+    // Apply rate limiting: 100 requests per minute
+    const checkRateLimit = rateLimiter({ maxRequests: 100, windowMs: 60000 });
+    await checkRateLimit(userId);
 
     const { lesion, currentAssessment, patientInfo } = request.data;
 
@@ -192,11 +207,18 @@ export const getTreatmentSuggestion = onCall(
       const result = JSON.parse(text);
 
       // Log usage for monitoring
-      console.log(`Treatment suggestion generated for user ${request.auth.uid}`);
+      monitoringLogger.logExecutionTime('getTreatmentSuggestion', startTime);
+      monitoringLogger.logAPIUsage(userId, 'gemini-treatment', 0.001);
+      monitoringLogger.info(`Treatment suggestion generated for user ${userId}`);
 
       return result;
     } catch (error: any) {
-      console.error('Error in getTreatmentSuggestion:', error);
+      monitoringLogger.error('Error in getTreatmentSuggestion', error);
+      
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      
       throw new HttpsError(
         'internal',
         `Failed to get treatment suggestion: ${error.message}`
@@ -217,8 +239,15 @@ export const getTreatmentSuggestion = onCall(
  * }
  */
 export const analyzeWoundImage = onCall(
-  { secrets: [geminiApiKeySecret] },
+  { 
+    secrets: [geminiApiKeySecret],
+    maxInstances: 10,
+    timeoutSeconds: 60,
+    memory: '1GiB'  // More memory for image processing
+  },
   async (request) => {
+    const startTime = Date.now();
+    
     // Verify user is authenticated
     if (!request.auth) {
       throw new HttpsError(
@@ -226,6 +255,12 @@ export const analyzeWoundImage = onCall(
         'User must be authenticated to analyze images'
       );
     }
+
+    const userId = request.auth.uid;
+
+    // Apply rate limiting: 50 requests per minute (more restrictive for image analysis)
+    const checkRateLimit = rateLimiter({ maxRequests: 50, windowMs: 60000 });
+    await checkRateLimit(userId);
 
     const { base64ImageUrl } = request.data;
 
@@ -298,11 +333,18 @@ export const analyzeWoundImage = onCall(
       const result = JSON.parse(text);
 
       // Log usage for monitoring
-      console.log(`Image analyzed for user ${request.auth.uid}`);
+      monitoringLogger.logExecutionTime('analyzeWoundImage', startTime);
+      monitoringLogger.logAPIUsage(userId, 'gemini-vision', 0.002);
+      monitoringLogger.info(`Image analyzed for user ${userId}`);
 
       return result;
     } catch (error: any) {
-      console.error('Error in analyzeWoundImage:', error);
+      monitoringLogger.error('Error in analyzeWoundImage', error);
+      
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      
       throw new HttpsError(
         'internal',
         `Failed to analyze image: ${error.message}`

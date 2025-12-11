@@ -4,6 +4,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
+import { initAppCheck } from './services/appCheckService';
 
 // Firebase configuration from environment variables
 // These values are safe to be public as they're just project identifiers
@@ -18,6 +19,9 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize Firebase App Check (for security)
+initAppCheck();
 
 // Initialize Firebase services
 export const auth = getAuth(app);
