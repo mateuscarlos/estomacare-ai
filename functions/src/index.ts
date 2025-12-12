@@ -189,22 +189,70 @@ export const getTreatmentSuggestion = onCall(
         }
       }
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: { parts },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: treatmentSchema,
-          temperature: 0.3,
-        },
-      });
+      // Retry logic for Gemini API calls
+      let lastError: any;
+      let result: any = null;
+      const maxRetries = 3;
+      
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: { parts },
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: treatmentSchema,
+              temperature: 0.3,
+            },
+          });
 
-      const text = response.text;
-      if (!text) {
-        throw new Error("No response from AI");
+          const text = response.text;
+          if (!text) {
+            throw new Error("No response from AI");
+          }
+
+          result = JSON.parse(text);
+          break; // Success, exit retry loop
+          
+        } catch (error: any) {
+          lastError = error;
+          
+          // Check if error is retryable (503, 500, or overloaded)
+          const isRetryable = 
+            error.message?.includes('503') ||
+            error.message?.includes('500') ||
+            error.message?.includes('overloaded') ||
+            error.message?.includes('UNAVAILABLE') ||
+            error.message?.includes('RESOURCE_EXHAUSTED');
+          
+          if (!isRetryable || attempt === maxRetries) {
+            monitoringLogger.error(`Error in getTreatmentSuggestion (attempt ${attempt + 1}/${maxRetries + 1})`, error);
+            break;
+          }
+          
+          // Exponential backoff: 2s, 4s, 8s
+          const delay = Math.min(2000 * Math.pow(2, attempt), 10000);
+          monitoringLogger.info(`Retrying getTreatmentSuggestion in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-
-      const result = JSON.parse(text);
+      
+      if (!result) {
+        monitoringLogger.error('All retries failed for getTreatmentSuggestion', lastError);
+        
+        // Provide user-friendly error message
+        if (lastError.message?.includes('overloaded') || lastError.message?.includes('503')) {
+          throw new HttpsError(
+            'unavailable',
+            'O serviço de IA está temporariamente sobrecarregado. Por favor, tente novamente em alguns instantes.'
+          );
+        }
+        
+        throw new HttpsError(
+          'internal',
+          `Falha ao obter sugestão de tratamento: ${lastError.message}`
+        );
+      }
 
       // Log usage for monitoring
       monitoringLogger.logExecutionTime('getTreatmentSuggestion', startTime);
@@ -221,7 +269,7 @@ export const getTreatmentSuggestion = onCall(
       
       throw new HttpsError(
         'internal',
-        `Failed to get treatment suggestion: ${error.message}`
+        `Falha ao obter sugestão de tratamento: ${error.message}`
       );
     }
   }
@@ -305,32 +353,80 @@ export const analyzeWoundImage = onCall(
         Responda APENAS com o JSON.
       `;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: base64Data
-              }
+      // Retry logic for Gemini API calls
+      let lastError: any;
+      let result: any = null;
+      const maxRetries = 3;
+      
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data
+                  }
+                },
+                { text: promptText }
+              ]
             },
-            { text: promptText }
-          ]
-        },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: imageAnalysisSchema,
-          temperature: 0.1,
-        },
-      });
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: imageAnalysisSchema,
+              temperature: 0.1,
+            },
+          });
 
-      const text = response.text;
-      if (!text) {
-        throw new Error("No response from AI analysis");
+          const text = response.text;
+          if (!text) {
+            throw new Error("No response from AI analysis");
+          }
+
+          result = JSON.parse(text);
+          break; // Success, exit retry loop
+          
+        } catch (error: any) {
+          lastError = error;
+          
+          // Check if error is retryable (503, 500, or overloaded)
+          const isRetryable = 
+            error.message?.includes('503') ||
+            error.message?.includes('500') ||
+            error.message?.includes('overloaded') ||
+            error.message?.includes('UNAVAILABLE') ||
+            error.message?.includes('RESOURCE_EXHAUSTED');
+          
+          if (!isRetryable || attempt === maxRetries) {
+            monitoringLogger.error(`Error in analyzeWoundImage (attempt ${attempt + 1}/${maxRetries + 1})`, error);
+            break;
+          }
+          
+          // Exponential backoff: 2s, 4s, 8s
+          const delay = Math.min(2000 * Math.pow(2, attempt), 10000);
+          monitoringLogger.info(`Retrying analyzeWoundImage in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-
-      const result = JSON.parse(text);
+      
+      if (!result) {
+        monitoringLogger.error('All retries failed for analyzeWoundImage', lastError);
+        
+        // Provide user-friendly error message
+        if (lastError.message?.includes('overloaded') || lastError.message?.includes('503')) {
+          throw new HttpsError(
+            'unavailable',
+            'O serviço de IA está temporariamente sobrecarregado. Por favor, tente novamente em alguns instantes.'
+          );
+        }
+        
+        throw new HttpsError(
+          'internal',
+          `Falha ao analisar imagem: ${lastError.message}`
+        );
+      }
 
       // Log usage for monitoring
       monitoringLogger.logExecutionTime('analyzeWoundImage', startTime);
@@ -347,7 +443,7 @@ export const analyzeWoundImage = onCall(
       
       throw new HttpsError(
         'internal',
-        `Failed to analyze image: ${error.message}`
+        `Falha ao analisar imagem: ${error.message}`
       );
     }
   }

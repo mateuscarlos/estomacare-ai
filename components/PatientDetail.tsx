@@ -11,6 +11,7 @@ import {
   TissuePercentage, LesionType
 } from '../types';
 import { getTreatmentSuggestion, analyzeWoundImage } from '../services/firebaseGeminiService';
+import { analyticsService } from '../services/analyticsService';
 import { generateLesionPDF } from '../services/pdfService';
 import { getPatientLesions, createLesion, updateLesion, deleteLesion } from '../services/firestoreService';
 import {
@@ -119,6 +120,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
     if (!lastAssessment) return;
 
     setIsAnalyzing(true);
+    analyticsService.logAISuggestionRequest();
     try {
       // Build a richer context string including allergies and history
       const patientContext = `
@@ -145,9 +147,13 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
       
       // Update local state
       setLesions(lesions.map(l => l.id === lesion.id ? {...l, assessments: updatedAssessments} : l));
-    } catch (error) {
+      
+      // Log success
+      analyticsService.logAISuggestionSuccess(lesion.type);
+    } catch (error: any) {
       console.error(error);
-      alert("Erro ao conectar com a IA. Verifique sua chave API.");
+      analyticsService.logAISuggestionError(error.message || 'Erro desconhecido');
+      alert(error.message || "Erro ao conectar com a IA. Por favor, tente novamente.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -168,6 +174,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
     if (!newAssessment.imageUrl) return;
 
     setIsAnalyzingImage(true);
+    analyticsService.logImageAnalysis();
     try {
       const analysis = await analyzeWoundImage(newAssessment.imageUrl);
       
@@ -177,8 +184,11 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
         // Preserve dimensions and pain as they are hard to guess from image alone, but overwrite clinical observations
         notes: (prev.notes ? prev.notes + '\n' : '') + '[IA Visual]: ' + (analysis.notes || '')
       }));
-    } catch (e) {
+      
+      analyticsService.logImageAnalysisSuccess();
+    } catch (e: any) {
       console.error(e);
+      analyticsService.logImageAnalysisError(e.message || 'Erro desconhecido');
       alert("Não foi possível analisar a imagem. Tente novamente.");
     } finally {
       setIsAnalyzingImage(false);
