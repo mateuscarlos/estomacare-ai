@@ -21,8 +21,12 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase App Check (for security)
-initAppCheck();
+// Initialize Firebase App Check (for security) - Optional in development
+try {
+  initAppCheck(app);
+} catch (error) {
+  console.warn('⚠️ App Check initialization failed. This is OK in development:', error);
+}
 
 // Initialize Firebase services
 export const auth = getAuth(app);

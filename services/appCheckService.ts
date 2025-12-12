@@ -4,29 +4,30 @@
  */
 
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
-import app from '../firebase';
+import type { FirebaseApp } from 'firebase/app';
 
 let appCheck: ReturnType<typeof initializeAppCheck> | null = null;
 
 /**
  * Initialize Firebase App Check
  * Protects backend resources from abuse
+ * NOTE: Disabled in development to avoid 403 errors
  */
-export const initAppCheck = () => {
+export const initAppCheck = (app: FirebaseApp) => {
+  // Skip App Check in development environment
+  if (import.meta.env.DEV) {
+    console.log('🔧 App Check disabled in development mode');
+    return null;
+  }
+  
   if (typeof window !== 'undefined' && !appCheck) {
     try {
-      // Use test key for development, real key for production
+      // Use reCAPTCHA key for production
       const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
       
       if (!siteKey) {
         console.warn('⚠️ VITE_RECAPTCHA_SITE_KEY not configured. App Check disabled.');
         return null;
-      }
-
-      // Enable debug token in development
-      if (import.meta.env.DEV) {
-        (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-        console.log('🔧 App Check debug mode enabled');
       }
 
       appCheck = initializeAppCheck(app, {
@@ -37,7 +38,8 @@ export const initAppCheck = () => {
       console.log('✅ Firebase App Check initialized');
       return appCheck;
     } catch (error) {
-      console.error('❌ Error initializing App Check:', error);
+      console.warn('⚠️ App Check initialization failed:', error);
+      // Return null instead of throwing to prevent app crash
       return null;
     }
   }

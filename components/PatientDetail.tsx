@@ -303,10 +303,12 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
       }
   };
 
-  const chartData = activeLesion?.assessments.map(a => ({
-    date: new Date(a.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-    area: (a.widthMm * a.heightMm).toFixed(1)
-  }));
+  const chartData = activeLesion?.assessments && activeLesion.assessments.length > 0
+    ? activeLesion.assessments.map(a => ({
+        date: new Date(a.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        area: parseFloat((a.widthMm * a.heightMm).toFixed(1))
+      }))
+    : [];
 
   // Options lists based on PDF
   const infectionOptions = ['Calor local', 'Odor fétido', 'Edema', 'Eritema', 'Febre', 'Pus/Abscesso', 'Celulite'];
@@ -636,22 +638,24 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
               )}
 
               {/* Progress Chart */}
-              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                 <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wider">Evolução da Área (mm²)</h3>
-                 <div className="h-64 w-full">
-                   <ResponsiveContainer width="100%" height="100%">
-                     <LineChart data={chartData}>
-                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                       <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} dy={10} />
-                       <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
-                       <Tooltip 
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                       />
-                       <Line type="monotone" dataKey="area" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
-                     </LineChart>
-                   </ResponsiveContainer>
-                 </div>
-              </div>
+              {activeLesion && chartData && chartData.length > 0 && (
+                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wider">Evolução da Área (mm²)</h3>
+                  <div style={{ width: '100%', height: 256, minHeight: 256, minWidth: 300, position: 'relative' }}>
+                    <ResponsiveContainer width="100%" height={256} minWidth={300} minHeight={256}>
+                      <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                        />
+                        <Line type="monotone" dataKey="area" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
 
               {/* AI Suggestion Display */}
               {activeLesion.assessments[activeLesion.assessments.length - 1]?.aiSuggestion && (
