@@ -103,39 +103,46 @@ export const getTreatmentSuggestion = onCall(
   async (request) => {
     const startTime = Date.now();
     
-    // Verify user is authenticated
-    if (!request.auth) {
-      throw new HttpsError(
-        'unauthenticated',
-        'User must be authenticated to get treatment suggestions'
-      );
-    }
-
-    const userId = request.auth.uid;
-
-    // Apply rate limiting: 100 requests per minute
-    const checkRateLimit = rateLimiter({ maxRequests: 100, windowMs: 60000 });
-    await checkRateLimit(userId);
-
-    const { lesion, currentAssessment, patientInfo } = request.data;
-
-    if (!lesion || !currentAssessment) {
-      throw new HttpsError(
-        'invalid-argument',
-        'lesion and currentAssessment are required'
-      );
-    }
-
-    const GEMINI_API_KEY = geminiApiKeySecret.value();
-
-    if (!GEMINI_API_KEY) {
-      throw new HttpsError(
-        'failed-precondition',
-        'Gemini API Key not configured'
-      );
-    }
-
     try {
+      // Verify user is authenticated
+      if (!request.auth) {
+        const error = new HttpsError(
+          'unauthenticated',
+          'User must be authenticated to get treatment suggestions'
+        );
+        monitoringLogger.error('Unauthenticated request to getTreatmentSuggestion', error);
+        throw error;
+      }
+
+      const userId = request.auth.uid;
+      monitoringLogger.info(`getTreatmentSuggestion called by user ${userId}`);
+
+      // Apply rate limiting: 100 requests per minute
+      const checkRateLimit = rateLimiter({ maxRequests: 100, windowMs: 60000 });
+      await checkRateLimit(userId);
+
+      const { lesion, currentAssessment, patientInfo } = request.data;
+
+      if (!lesion || !currentAssessment) {
+        const error = new HttpsError(
+          'invalid-argument',
+          'lesion and currentAssessment are required'
+        );
+        monitoringLogger.error('Missing required parameters in getTreatmentSuggestion', error);
+        throw error;
+      }
+
+      const GEMINI_API_KEY = geminiApiKeySecret.value();
+
+      if (!GEMINI_API_KEY) {
+        const error = new HttpsError(
+          'failed-precondition',
+          'Gemini API Key not configured'
+        );
+        monitoringLogger.error('Gemini API Key not configured in getTreatmentSuggestion', error);
+        throw error;
+      }
+
       const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
       const promptText = `
@@ -296,39 +303,46 @@ export const analyzeWoundImage = onCall(
   async (request) => {
     const startTime = Date.now();
     
-    // Verify user is authenticated
-    if (!request.auth) {
-      throw new HttpsError(
-        'unauthenticated',
-        'User must be authenticated to analyze images'
-      );
-    }
-
-    const userId = request.auth.uid;
-
-    // Apply rate limiting: 50 requests per minute (more restrictive for image analysis)
-    const checkRateLimit = rateLimiter({ maxRequests: 50, windowMs: 60000 });
-    await checkRateLimit(userId);
-
-    const { base64ImageUrl } = request.data;
-
-    if (!base64ImageUrl) {
-      throw new HttpsError(
-        'invalid-argument',
-        'base64ImageUrl is required'
-      );
-    }
-
-    const GEMINI_API_KEY = geminiApiKeySecret.value();
-
-    if (!GEMINI_API_KEY) {
-      throw new HttpsError(
-        'failed-precondition',
-        'Gemini API Key not configured'
-      );
-    }
-
     try {
+      // Verify user is authenticated
+      if (!request.auth) {
+        const error = new HttpsError(
+          'unauthenticated',
+          'User must be authenticated to analyze images'
+        );
+        monitoringLogger.error('Unauthenticated request to analyzeWoundImage', error);
+        throw error;
+      }
+
+      const userId = request.auth.uid;
+      monitoringLogger.info(`analyzeWoundImage called by user ${userId}`);
+
+      // Apply rate limiting: 50 requests per minute (more restrictive for image analysis)
+      const checkRateLimit = rateLimiter({ maxRequests: 50, windowMs: 60000 });
+      await checkRateLimit(userId);
+
+      const { base64ImageUrl } = request.data;
+
+      if (!base64ImageUrl) {
+        const error = new HttpsError(
+          'invalid-argument',
+          'base64ImageUrl is required'
+        );
+        monitoringLogger.error('Missing base64ImageUrl in request', error);
+        throw error;
+      }
+
+      const GEMINI_API_KEY = geminiApiKeySecret.value();
+
+      if (!GEMINI_API_KEY) {
+        const error = new HttpsError(
+          'failed-precondition',
+          'Gemini API Key not configured'
+        );
+        monitoringLogger.error('Gemini API Key not configured', error);
+        throw error;
+      }
+
       const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
       const base64Data = base64ImageUrl.split(',')[1];

@@ -31,13 +31,15 @@ const getDb = () => {
  */
 export const rateLimiter = (config: RateLimitConfig = { maxRequests: 100, windowMs: 60000 }) => {
   return async (userId: string): Promise<void> => {
-    const db = getDb();
-    const now = Date.now();
-    const windowStart = now - config.windowMs;
-    
-    const rateLimitDoc = db.collection('rateLimits').doc(userId);
-    
+    // If rate limiter fails, allow the request to proceed
+    // Better to allow some abuse than block legitimate users
     try {
+      const db = getDb();
+      const now = Date.now();
+      const windowStart = now - config.windowMs;
+      
+      const rateLimitDoc = db.collection('rateLimits').doc(userId);
+      
       await db.runTransaction(async (transaction) => {
         const doc = await transaction.get(rateLimitDoc);
         
@@ -72,11 +74,12 @@ export const rateLimiter = (config: RateLimitConfig = { maxRequests: 100, window
         });
       });
     } catch (error: any) {
-      if (error instanceof HttpsError) {
+      if (error instanceof HttpsError && error.code === 'resource-exhausted') {
+        // Throw rate limit errors
         throw error;
       }
-      console.error('Rate limiter error:', error);
-      // Don't block on rate limiter errors
+      // Log but don't block on other rate limiter errors
+      console.error('Rate limiter error (allowing request to proceed):', error);
     }
   };
 };
