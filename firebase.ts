@@ -4,6 +4,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
+import { initAppCheck } from './services/appCheckService';
 
 // Firebase configuration from environment variables
 // These values are safe to be public as they're just project identifiers
@@ -14,10 +15,18 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize Firebase App Check (for security) - Optional in development
+try {
+  initAppCheck(app);
+} catch (error) {
+  console.warn('⚠️ App Check initialization failed. This is OK in development:', error);
+}
 
 // Initialize Firebase services
 export const auth = getAuth(app);

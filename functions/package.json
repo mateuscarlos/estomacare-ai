@@ -1,6 +1,6 @@
 {
   "name": "estomacare-functions",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "description": "Cloud Functions for EstomaCare AI",
   "main": "lib/index.js",
   "scripts": {

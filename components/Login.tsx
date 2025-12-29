@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Activity, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/firebaseAuthService';
+import { analyticsService } from '../services/analyticsService';
 import { User } from '../types';
 
 interface LoginProps {
@@ -24,6 +25,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     try {
       const user = await authService.login(email, password);
+      analyticsService.logLogin('email');
+      analyticsService.setUser(user.uid);
       onLogin(user);
       navigate('/');
     } catch (err: any) {
@@ -38,6 +41,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError('');
     try {
         const user = await authService.loginWithGoogle();
+        analyticsService.logLogin('google');
+        analyticsService.setUser(user.uid);
         onLogin(user);
         navigate('/');
     } catch (err: any) {

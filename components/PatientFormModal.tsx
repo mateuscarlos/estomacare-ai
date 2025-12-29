@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Camera, Save, User, MapPin, Activity, Pill, Cigarette, Wine } from 'lucide-react';
 import { Patient } from '../types';
+import { analyticsService } from '../services/analyticsService';
 
 interface PatientFormModalProps {
   isOpen: boolean;
@@ -99,6 +100,13 @@ const PatientFormModal: React.FC<PatientFormModalProps> = ({ isOpen, onClose, on
       medications: formData.medications,
       photoUrl: formData.photoUrl || `https://ui-avatars.com/api/?name=${formData.name}&background=random`
     };
+
+    // Log analytics
+    if (initialData) {
+      analyticsService.logPatientUpdated();
+    } else {
+      analyticsService.logPatientCreated();
+    }
 
     onSave(patientToSave);
     onClose();

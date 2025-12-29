@@ -2,6 +2,8 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, Type, Schema } from '@google/genai';
 import { defineSecret } from 'firebase-functions/params';
+import { rateLimiter } from './middleware/rateLimiter';
+import { monitoringLogger } from './utils/monitoring';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -92,8 +94,15 @@ const imageAnalysisSchema: Schema = {
  * }
  */
 export const getTreatmentSuggestion = onCall(
-  { secrets: [geminiApiKeySecret] },
+  { 
+    secrets: [geminiApiKeySecret],
+    maxInstances: 10,
+    timeoutSeconds: 60,
+    memory: '512MiB'
+  },
   async (request) => {
+    const startTime = Date.now();
+    
     // Verify user is authenticated
     if (!request.auth) {
       throw new HttpsError(
@@ -101,6 +110,12 @@ export const getTreatmentSuggestion = onCall(
         'User must be authenticated to get treatment suggestions'
       );
     }
+
+    const userId = request.auth.uid;
+
+    // Apply rate limiting: 100 requests per minute
+    const checkRateLimit = rateLimiter({ maxRequests: 100, windowMs: 60000 });
+    await checkRateLimit(userId);
 
     const { lesion, currentAssessment, patientInfo } = request.data;
 
@@ -174,32 +189,87 @@ export const getTreatmentSuggestion = onCall(
         }
       }
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: { parts },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: treatmentSchema,
-          temperature: 0.3,
-        },
-      });
+      // Retry logic for Gemini API calls
+      let lastError: any;
+      let result: any = null;
+      const maxRetries = 3;
+      
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: { parts },
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: treatmentSchema,
+              temperature: 0.3,
+            },
+          });
 
-      const text = response.text;
-      if (!text) {
-        throw new Error("No response from AI");
+          const text = response.text;
+          if (!text) {
+            throw new Error("No response from AI");
+          }
+
+          result = JSON.parse(text);
+          break; // Success, exit retry loop
+          
+        } catch (error: any) {
+          lastError = error;
+          
+          // Check if error is retryable (503, 500, or overloaded)
+          const isRetryable = 
+            error.message?.includes('503') ||
+            error.message?.includes('500') ||
+            error.message?.includes('overloaded') ||
+            error.message?.includes('UNAVAILABLE') ||
+            error.message?.includes('RESOURCE_EXHAUSTED');
+          
+          if (!isRetryable || attempt === maxRetries) {
+            monitoringLogger.error(`Error in getTreatmentSuggestion (attempt ${attempt + 1}/${maxRetries + 1})`, error);
+            break;
+          }
+          
+          // Exponential backoff: 2s, 4s, 8s
+          const delay = Math.min(2000 * Math.pow(2, attempt), 10000);
+          monitoringLogger.info(`Retrying getTreatmentSuggestion in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+      
+      if (!result) {
+        monitoringLogger.error('All retries failed for getTreatmentSuggestion', lastError);
+        
+        // Provide user-friendly error message
+        if (lastError.message?.includes('overloaded') || lastError.message?.includes('503')) {
+          throw new HttpsError(
+            'unavailable',
+            'O serviço de IA está temporariamente sobrecarregado. Por favor, tente novamente em alguns instantes.'
+          );
+        }
+        
+        throw new HttpsError(
+          'internal',
+          `Falha ao obter sugestão de tratamento: ${lastError.message}`
+        );
       }
 
-      const result = JSON.parse(text);
-
       // Log usage for monitoring
-      console.log(`Treatment suggestion generated for user ${request.auth.uid}`);
+      monitoringLogger.logExecutionTime('getTreatmentSuggestion', startTime);
+      monitoringLogger.logAPIUsage(userId, 'gemini-treatment', 0.001);
+      monitoringLogger.info(`Treatment suggestion generated for user ${userId}`);
 
       return result;
     } catch (error: any) {
-      console.error('Error in getTreatmentSuggestion:', error);
+      monitoringLogger.error('Error in getTreatmentSuggestion', error);
+      
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      
       throw new HttpsError(
         'internal',
-        `Failed to get treatment suggestion: ${error.message}`
+        `Falha ao obter sugestão de tratamento: ${error.message}`
       );
     }
   }
@@ -217,8 +287,15 @@ export const getTreatmentSuggestion = onCall(
  * }
  */
 export const analyzeWoundImage = onCall(
-  { secrets: [geminiApiKeySecret] },
+  { 
+    secrets: [geminiApiKeySecret],
+    maxInstances: 10,
+    timeoutSeconds: 60,
+    memory: '1GiB'  // More memory for image processing
+  },
   async (request) => {
+    const startTime = Date.now();
+    
     // Verify user is authenticated
     if (!request.auth) {
       throw new HttpsError(
@@ -226,6 +303,12 @@ export const analyzeWoundImage = onCall(
         'User must be authenticated to analyze images'
       );
     }
+
+    const userId = request.auth.uid;
+
+    // Apply rate limiting: 50 requests per minute (more restrictive for image analysis)
+    const checkRateLimit = rateLimiter({ maxRequests: 50, windowMs: 60000 });
+    await checkRateLimit(userId);
 
     const { base64ImageUrl } = request.data;
 
@@ -270,42 +353,97 @@ export const analyzeWoundImage = onCall(
         Responda APENAS com o JSON.
       `;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: base64Data
-              }
+      // Retry logic for Gemini API calls
+      let lastError: any;
+      let result: any = null;
+      const maxRetries = 3;
+      
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data
+                  }
+                },
+                { text: promptText }
+              ]
             },
-            { text: promptText }
-          ]
-        },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: imageAnalysisSchema,
-          temperature: 0.1,
-        },
-      });
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: imageAnalysisSchema,
+              temperature: 0.1,
+            },
+          });
 
-      const text = response.text;
-      if (!text) {
-        throw new Error("No response from AI analysis");
+          const text = response.text;
+          if (!text) {
+            throw new Error("No response from AI analysis");
+          }
+
+          result = JSON.parse(text);
+          break; // Success, exit retry loop
+          
+        } catch (error: any) {
+          lastError = error;
+          
+          // Check if error is retryable (503, 500, or overloaded)
+          const isRetryable = 
+            error.message?.includes('503') ||
+            error.message?.includes('500') ||
+            error.message?.includes('overloaded') ||
+            error.message?.includes('UNAVAILABLE') ||
+            error.message?.includes('RESOURCE_EXHAUSTED');
+          
+          if (!isRetryable || attempt === maxRetries) {
+            monitoringLogger.error(`Error in analyzeWoundImage (attempt ${attempt + 1}/${maxRetries + 1})`, error);
+            break;
+          }
+          
+          // Exponential backoff: 2s, 4s, 8s
+          const delay = Math.min(2000 * Math.pow(2, attempt), 10000);
+          monitoringLogger.info(`Retrying analyzeWoundImage in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+      
+      if (!result) {
+        monitoringLogger.error('All retries failed for analyzeWoundImage', lastError);
+        
+        // Provide user-friendly error message
+        if (lastError.message?.includes('overloaded') || lastError.message?.includes('503')) {
+          throw new HttpsError(
+            'unavailable',
+            'O serviço de IA está temporariamente sobrecarregado. Por favor, tente novamente em alguns instantes.'
+          );
+        }
+        
+        throw new HttpsError(
+          'internal',
+          `Falha ao analisar imagem: ${lastError.message}`
+        );
       }
 
-      const result = JSON.parse(text);
-
       // Log usage for monitoring
-      console.log(`Image analyzed for user ${request.auth.uid}`);
+      monitoringLogger.logExecutionTime('analyzeWoundImage', startTime);
+      monitoringLogger.logAPIUsage(userId, 'gemini-vision', 0.002);
+      monitoringLogger.info(`Image analyzed for user ${userId}`);
 
       return result;
     } catch (error: any) {
-      console.error('Error in analyzeWoundImage:', error);
+      monitoringLogger.error('Error in analyzeWoundImage', error);
+      
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      
       throw new HttpsError(
         'internal',
-        `Failed to analyze image: ${error.message}`
+        `Falha ao analisar imagem: ${error.message}`
       );
     }
   }
