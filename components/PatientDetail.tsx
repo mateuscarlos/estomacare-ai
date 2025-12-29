@@ -181,8 +181,9 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
       setNewAssessment(prev => ({
         ...prev,
         ...analysis,
-        // Preserve dimensions and pain as they are hard to guess from image alone, but overwrite clinical observations
-        notes: (prev.notes ? prev.notes + '\n' : '') + '[IA Visual]: ' + (analysis.notes || '')
+        // Preserve dimensions and pain as they are hard to guess from image alone
+        // Notes already comes with [IA Visual]: prefix from the backend
+        notes: analysis.notes ? (prev.notes ? prev.notes + '\n\n' + analysis.notes : analysis.notes) : prev.notes
       }));
       
       analyticsService.logImageAnalysisSuccess();

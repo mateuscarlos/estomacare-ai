@@ -146,8 +146,8 @@ export const getTreatmentSuggestion = onCall(
       const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
       const promptText = `
-        Atue como um Estomaterapeuta Especialista Sênior.
-        Analise a IMAGEM (se fornecida) e os DADOS CLÍNICOS abaixo para sugerir o melhor tratamento (coberturas).
+        Atue como um Estomaterapeuta Especialista Sênior com vasta experiência clínica.
+        Analise DETALHADAMENTE a IMAGEM (se fornecida) e os DADOS CLÍNICOS abaixo para sugerir o melhor tratamento baseado em evidências científicas.
 
         === DADOS DO PACIENTE E CONTEXTO ===
         ${patientInfo || 'Não informado'}
@@ -170,13 +170,20 @@ export const getTreatmentSuggestion = onCall(
         DOR (0-10): ${currentAssessment.painLevel}
         OBSERVAÇÕES DA ENFERMAGEM: ${currentAssessment.notes}
 
-        === INSTRUÇÕES PARA A IA ===
+        === INSTRUÇÕES CRÍTICAS ===
         1. ALERGIAS: Verifique rigorosamente a seção "Dados do Paciente". Se houver alergias listadas (ex: Prata, Iodo, Látex, Sulfa), NÃO sugira produtos que contenham esses componentes.
         2. HISTÓRICO: Considere os "Tratamentos Anteriores" listados no contexto. Se um tratamento anterior falhou, sugira uma alternativa ou justifique a manutenção com mudanças na frequência/aplicação.
         3. ANÁLISE VISUAL: Se houver imagem, utilize-a para confirmar a presença de biofilme, maceração ou necrose não relatada nos dados numéricos.
-        4. PROTOCOLO: Forneça a sugestão de limpeza, cobertura primária, secundária e frequência.
+        4. PROTOCOLO COMPLETO: Forneça sugestão detalhada de limpeza, cobertura primária, secundária e frequência de troca.
+        5. CAMPO "rationale": Forneça uma justificativa DETALHADA e PROFISSIONAL em português brasileiro explicando:
+           - Por que esta cobertura é a mais adequada para o tipo de tecido presente
+           - Como ela atua no manejo do exsudato
+           - Benefícios específicos para as características da ferida
+           - Considerações sobre prevenção de infecção se aplicável
+           - Expectativas de evolução
+           Use linguagem técnica mas clara (mínimo 4-5 frases)
 
-        Responda estritamente no formato JSON solicitado.
+        Responda SEMPRE em português brasileiro e estritamente no formato JSON solicitado.
       `;
 
       const parts: any[] = [{ text: promptText }];
@@ -204,7 +211,7 @@ export const getTreatmentSuggestion = onCall(
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
           const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash-exp",
+            model: "gemini-1.5-pro",
             contents: { parts },
             config: {
               responseMimeType: "application/json",
@@ -367,15 +374,35 @@ export const analyzeWoundImage = onCall(
       }
 
       const promptText = `
-        Analise esta imagem clínica de ferida.
-        Identifique as características visualmente observáveis para preencher um formulário de avaliação.
+        Você é um Estomaterapeuta Especialista com anos de experiência em análise de feridas.
+        Analise esta imagem clínica de ferida em DETALHES e forneça uma avaliação profissional completa.
         
-        Estime as porcentagens de tipo de tecido (TIME - Tissue) que devem somar 100%.
-        Estime o nível de exsudato (Umidade).
-        Identifique sinais visuais de infecção (Vermelhidão/Eritema, Edema, etc).
-        Identifique características das bordas e pele perilesão (Maceração, Hiperqueratose, etc).
+        INSTRUÇÕES IMPORTANTES:
+        1. Examine cuidadosamente todos os aspectos visíveis da ferida
+        2. Estime as porcentagens de tipos de tecido (TIME - Tissue) que DEVEM somar exatamente 100%
+        3. Avalie o nível de exsudato (umidade) visível
+        4. Identifique TODOS os sinais visuais de infecção ou inflamação
+        5. Observe as características das bordas da ferida
+        6. Examine a pele perilesão em detalhes
         
-        Responda APENAS com o JSON.
+        CAMPO "notes" (MUITO IMPORTANTE):
+        - Forneça uma descrição DETALHADA e PROFISSIONAL em português brasileiro
+        - Inclua observações sobre:
+          * Características gerais da ferida (profundidade aparente, forma, tamanho visual)
+          * Tipos de tecido presentes e sua distribuição
+          * Sinais de cicatrização ou deterioração
+          * Presença de biofilme, necrose, esfacelo ou tecido de granulação
+          * Características do exsudato (quantidade, aspecto)
+          * Condição das bordas (maceradas, epibólicas, descoladas, íntegras)
+          * Estado da pele ao redor (eritema, edema, maceração, ressecamento)
+          * Sinais de infecção (calor, rubor, edema, secreção purulenta)
+          * Qualquer outra observação clínica relevante
+        - Use linguagem técnica profissional mas clara
+        - Seja específico e detalhado (mínimo 5-7 frases)
+        - SEMPRE em português brasileiro
+        - Comece com "[IA Visual]: " para indicar que é uma análise automatizada
+        
+        Responda APENAS com o JSON estruturado conforme o schema fornecido.
       `;
 
       // Retry logic for Gemini API calls
@@ -386,7 +413,7 @@ export const analyzeWoundImage = onCall(
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
           const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash-exp",
+            model: "gemini-1.5-pro",
             contents: {
               parts: [
                 {
