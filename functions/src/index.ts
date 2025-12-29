@@ -1,6 +1,6 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
-import { GoogleGenAI, Type, Schema } from '@google/genai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { defineSecret } from 'firebase-functions/params';
 import { rateLimiter } from './middleware/rateLimiter';
 import { monitoringLogger } from './utils/monitoring';
@@ -12,68 +12,68 @@ admin.initializeApp();
 const geminiApiKeySecret = defineSecret('GEMINI_API_KEY');
 
 // Define schemas (same as in geminiService.ts)
-const treatmentSchema: Schema = {
-  type: Type.OBJECT,
+const treatmentSchema = {
+  type: SchemaType.OBJECT,
   properties: {
     cleaning: {
-      type: Type.STRING,
+      type: SchemaType.STRING,
       description: "Recommended cleaning method and solution (e.g., Saline, PHMB).",
     },
     primaryDressing: {
-      type: Type.STRING,
+      type: SchemaType.STRING,
       description: "The main dressing to be applied in contact with the wound bed.",
     },
     secondaryDressing: {
-      type: Type.STRING,
+      type: SchemaType.STRING,
       description: "The secondary dressing to secure the primary or manage exudate.",
     },
     frequency: {
-      type: Type.STRING,
+      type: SchemaType.STRING,
       description: "How often the dressing should be changed.",
     },
     rationale: {
-      type: Type.STRING,
+      type: SchemaType.STRING,
       description: "Brief medical explanation for this choice based on tissue type, exudate and visual analysis.",
     },
   },
   required: ["cleaning", "primaryDressing", "secondaryDressing", "frequency", "rationale"],
 };
 
-const imageAnalysisSchema: Schema = {
-  type: Type.OBJECT,
+const imageAnalysisSchema = {
+  type: SchemaType.OBJECT,
   properties: {
     tissueTypes: {
-      type: Type.OBJECT,
+      type: SchemaType.OBJECT,
       properties: {
-        necrotic: { type: Type.NUMBER, description: "Percentage of necrotic tissue (black/brown)." },
-        slough: { type: Type.NUMBER, description: "Percentage of slough (yellow/fibrous)." },
-        granulation: { type: Type.NUMBER, description: "Percentage of granulation (red/pink)." },
-        epithelialization: { type: Type.NUMBER, description: "Percentage of epithelial tissue (pink edges)." }
+        necrotic: { type: SchemaType.NUMBER, description: "Percentage of necrotic tissue (black/brown)." },
+        slough: { type: SchemaType.NUMBER, description: "Percentage of slough (yellow/fibrous)." },
+        granulation: { type: SchemaType.NUMBER, description: "Percentage of granulation (red/pink)." },
+        epithelialization: { type: SchemaType.NUMBER, description: "Percentage of epithelial tissue (pink edges)." }
       },
       required: ["necrotic", "slough", "granulation", "epithelialization"]
     },
     exudate: {
-      type: Type.STRING,
+      type: SchemaType.STRING,
       description: "Level of exudate: 'Ausente/Seco', 'Baixo', 'Médio', or 'Alto'.",
       enum: ['Ausente/Seco', 'Baixo', 'Médio', 'Alto']
     },
     infectionSigns: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
       description: "Visual signs of infection e.g., 'Eritema', 'Edema', 'Pus/Abscesso'.",
     },
     woundEdges: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
       description: "Characteristics of edges e.g., 'Maceração', 'Epíbole (Enrolada)', 'Deslocamento'.",
     },
     periwoundSkin: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
       description: "Characteristics of periwound skin e.g., 'Maceração', 'Escoriação', 'Xerose (Seca)', 'Hiperqueratose'.",
     },
     notes: {
-      type: Type.STRING,
+      type: SchemaType.STRING,
       description: "Short clinical observation summary based on the image.",
     }
   },
@@ -143,7 +143,15 @@ export const getTreatmentSuggestion = onCall(
         throw error;
       }
 
-      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-pro",
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: treatmentSchema,
+          temperature: 0.3,
+        }
+      });
 
       const promptText = `
         Atue como um Estomaterapeuta Especialista Sênior com vasta experiência clínica.
@@ -210,26 +218,10 @@ export const getTreatmentSuggestion = onCall(
       
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-          const response = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
-            contents: { parts },
-            config: {
-              responseMimeType: "application/json",
-              responseSchema: treatmentSchema,
-              temperature: 0.3,
-            },
-          });
+          const response = await model.generateContent(parts.map(p => p.text || p));
 
-          // Try different ways to get the response text
-          let text = response.text;
-          
-          // If text is not available directly, try accessing candidates
-          if (!text && response.candidates && response.candidates.length > 0) {
-            const candidate = response.candidates[0];
-            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-              text = candidate.content.parts[0].text;
-            }
-          }
+          // Get the response text
+          let text = response.response.text();
           
           if (!text || text === '""' || text === 'null') {
             monitoringLogger.error('Empty response from Gemini API', { response: JSON.stringify(response) });
@@ -361,7 +353,15 @@ export const analyzeWoundImage = onCall(
         throw error;
       }
 
-      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-pro",
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: imageAnalysisSchema,
+          temperature: 0.1,
+        }
+      });
 
       const base64Data = base64ImageUrl.split(',')[1];
       const mimeType = base64ImageUrl.split(';')[0].split(':')[1];
@@ -412,36 +412,18 @@ export const analyzeWoundImage = onCall(
       
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-          const response = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
-            contents: {
-              parts: [
-                {
-                  inlineData: {
-                    mimeType: mimeType,
-                    data: base64Data
-                  }
-                },
-                { text: promptText }
-              ]
+          const response = await model.generateContent([
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: base64Data
+              }
             },
-            config: {
-              responseMimeType: "application/json",
-              responseSchema: imageAnalysisSchema,
-              temperature: 0.1,
-            },
-          });
+            { text: promptText }
+          ]);
 
-          // Try different ways to get the response text
-          let text = response.text;
-          
-          // If text is not available directly, try accessing candidates
-          if (!text && response.candidates && response.candidates.length > 0) {
-            const candidate = response.candidates[0];
-            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-              text = candidate.content.parts[0].text;
-            }
-          }
+          // Get the response text
+          let text = response.response.text();
           
           if (!text || text === '""' || text === 'null') {
             monitoringLogger.error('Empty response from Gemini API', { response: JSON.stringify(response) });
