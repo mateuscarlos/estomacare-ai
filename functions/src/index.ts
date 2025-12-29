@@ -204,7 +204,7 @@ export const getTreatmentSuggestion = onCall(
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
           const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash-exp",
             contents: { parts },
             config: {
               responseMimeType: "application/json",
@@ -213,8 +213,19 @@ export const getTreatmentSuggestion = onCall(
             },
           });
 
-          const text = response.text;
-          if (!text) {
+          // Try different ways to get the response text
+          let text = response.text;
+          
+          // If text is not available directly, try accessing candidates
+          if (!text && response.candidates && response.candidates.length > 0) {
+            const candidate = response.candidates[0];
+            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+              text = candidate.content.parts[0].text;
+            }
+          }
+          
+          if (!text || text === '""' || text === 'null') {
+            monitoringLogger.error('Empty response from Gemini API', { response: JSON.stringify(response) });
             throw new Error("No response from AI");
           }
 
@@ -375,7 +386,7 @@ export const analyzeWoundImage = onCall(
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
           const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash-exp",
             contents: {
               parts: [
                 {
@@ -394,8 +405,19 @@ export const analyzeWoundImage = onCall(
             },
           });
 
-          const text = response.text;
-          if (!text) {
+          // Try different ways to get the response text
+          let text = response.text;
+          
+          // If text is not available directly, try accessing candidates
+          if (!text && response.candidates && response.candidates.length > 0) {
+            const candidate = response.candidates[0];
+            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+              text = candidate.content.parts[0].text;
+            }
+          }
+          
+          if (!text || text === '""' || text === 'null') {
+            monitoringLogger.error('Empty response from Gemini API', { response: JSON.stringify(response) });
             throw new Error("No response from AI analysis");
           }
 
