@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Users, Activity, AlertCircle, Search, Plus, X, ChevronRight } from 'lucide-react';
 import { Patient, LesionType } from '../types';
 import { useNavigate } from 'react-router-dom';
@@ -54,10 +54,10 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, onAddPatient }) => {
   }, [patients]);
 
   // Search Logic
-  const filteredPatients = patients.filter(p => 
+  const filteredPatients = useMemo(() => patients.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.id.includes(searchTerm)
-  );
+  ), [patients, searchTerm]);
 
   const StatCard = ({ title, value, icon, color, subtext }: any) => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-start justify-between hover:shadow-md transition-shadow">
