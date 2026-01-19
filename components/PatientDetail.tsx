@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Plus, Brain, Calendar, Activity, 
@@ -80,9 +80,10 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
   const activeLesion = patient.lesions.find(l => l.id === activeLesionId);
 
   // Filter assessments that have AI suggestions for the consolidated history view
-  const assessmentsWithSuggestions = activeLesion 
+  // Memoized to avoid unnecessary filtering/reversing on every render
+  const assessmentsWithSuggestions = useMemo(() => activeLesion
     ? [...activeLesion.assessments].filter(a => a.aiSuggestion).reverse()
-    : [];
+    : [], [activeLesion]);
 
   const handleAIAnalysis = async (lesion: Lesion) => {
     const lastAssessment = lesion.assessments[lesion.assessments.length - 1];
@@ -259,10 +260,11 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
       }
   };
 
-  const chartData = activeLesion?.assessments.map(a => ({
+  // Memoized chart data preparation to prevent expensive date formatting on every render
+  const chartData = useMemo(() => activeLesion?.assessments.map(a => ({
     date: new Date(a.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
     area: (a.widthMm * a.heightMm).toFixed(1)
-  }));
+  })), [activeLesion]);
 
   // Options lists based on PDF
   const infectionOptions = ['Calor local', 'Odor fétido', 'Edema', 'Eritema', 'Febre', 'Pus/Abscesso', 'Celulite'];

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Users, Activity, AlertCircle, Search, Plus, X, ChevronRight } from 'lucide-react';
 import { Patient, LesionType } from '../types';
 import { useNavigate } from 'react-router-dom';
@@ -16,20 +16,25 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, onAddPatient }) => {
   const [showNewPatientModal, setShowNewPatientModal] = useState(false);
 
   // Stats Logic
-  const totalPatients = patients.length;
-  const totalLesions = patients.reduce((acc, p) => acc + p.lesions.length, 0);
-  const activeAlerts = patients.reduce((acc, p) => 
-    acc + p.lesions.filter(l => {
-      const lastAssessment = l.assessments[l.assessments.length - 1];
-      return lastAssessment.painLevel > 7 || (lastAssessment.tissueTypes?.necrotic || 0) > 20;
-    }).length
-  , 0);
+  // Memoized to prevent expensive recalculation on re-renders (e.g. typing in search)
+  const { totalPatients, totalLesions, activeAlerts } = useMemo(() => {
+    const totalPatients = patients.length;
+    const totalLesions = patients.reduce((acc, p) => acc + p.lesions.length, 0);
+    const activeAlerts = patients.reduce((acc, p) =>
+      acc + p.lesions.filter(l => {
+        const lastAssessment = l.assessments[l.assessments.length - 1];
+        return lastAssessment.painLevel > 7 || (lastAssessment.tissueTypes?.necrotic || 0) > 20;
+      }).length
+    , 0);
+    return { totalPatients, totalLesions, activeAlerts };
+  }, [patients]);
 
   // Search Logic
-  const filteredPatients = patients.filter(p => 
+  // Memoized filtered list to prevent re-filtering on unrelated state changes
+  const filteredPatients = useMemo(() => patients.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.id.includes(searchTerm)
-  );
+  ), [patients, searchTerm]);
 
   const StatCard = ({ title, value, icon, color, subtext }: any) => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-start justify-between hover:shadow-md transition-shadow">
