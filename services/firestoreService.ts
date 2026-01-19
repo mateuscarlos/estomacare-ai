@@ -267,7 +267,9 @@ export const updateLesion = async (lesionId: string, lesionData: Partial<Lesion>
     const lesionRef = doc(db, 'lesions', lesionId);
     // Remove id, patientId and assessments from updates - assessments are handled in sub-collection
     const { id, patientId, assessments, ...cleanData } = lesionData as any;
-    const serializedData = JSON.parse(JSON.stringify(cleanData));
+    
+    // Deep clone and strip undefined to ensure everything is serializable
+    const serializedData = deepCloneAndStripUndefined(cleanData);
     
     await updateDoc(lesionRef, {
       ...deepCloneAndStripUndefined(cleanData),

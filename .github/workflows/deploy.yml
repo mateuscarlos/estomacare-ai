@@ -98,28 +98,46 @@ jobs:
           cd functions
           npm run build
 
+      - name: Setup Firebase CLI Authentication
+        id: auth
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > $HOME/gcloud-key.json
+          echo "credentials_file_path=$HOME/gcloud-key.json" >> $GITHUB_OUTPUT
+
       - name: Deploy to Firebase Functions
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          PROJECT_ID="${{ secrets.VITE_FIREBASE_PROJECT_ID }}"
+          if [ -z "$PROJECT_ID" ]; then
+            echo "Error: VITE_FIREBASE_PROJECT_ID secret is not set"
+            exit 1
+          fi
+          npx firebase-tools@latest deploy --only functions --project "$PROJECT_ID"
         env:
-          FIREBASE_CLI_EXPERIMENTS: webframeworks
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
 
   deploy-firestore:
     name: Deploy Firestore Rules & Indexes
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if:  github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy Firestore Rules
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+      - name: Setup Firebase CLI Authentication
+        id: auth
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > $HOME/gcloud-key.json
+          echo "credentials_file_path=$HOME/gcloud-key.json" >> $GITHUB_OUTPUT
+
+      - name: Deploy Firestore Rules and Indexes
+        run: |
+          PROJECT_ID="${{ secrets.VITE_FIREBASE_PROJECT_ID }}"
+          if [ -z "$PROJECT_ID" ]; then
+            echo "Error: VITE_FIREBASE_PROJECT_ID secret is not set"
+            exit 1
+          fi
+          npx firebase-tools@latest deploy --only firestore --project "$PROJECT_ID"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
