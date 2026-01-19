@@ -87,7 +87,7 @@ describe('App Performance Reproduction', () => {
 
     // Fill login form
     const emailInput = screen.getByLabelText(/Endereço de e-mail/i);
-    const passwordInput = screen.getByLabelText(/Senha/i);
+    const passwordInput = screen.getByLabelText(/Senha/i, { selector: 'input' });
     const loginButton = screen.getByRole('button', { name: /Entrar/i });
 
     await userEvent.type(emailInput, 'test@example.com');

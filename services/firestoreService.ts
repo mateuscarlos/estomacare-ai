@@ -15,7 +15,6 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { deepClone } from '../utils/dataUtils';
 import { Patient, Lesion, Assessment } from '../types';
 import { deepCloneAndStripUndefined } from '../utils';
 
@@ -271,7 +270,7 @@ export const updateLesion = async (lesionId: string, lesionData: Partial<Lesion>
     const serializedData = JSON.parse(JSON.stringify(cleanData));
     
     await updateDoc(lesionRef, {
-      ...deepClone(cleanData),
+      ...deepCloneAndStripUndefined(cleanData),
       updatedAt: Timestamp.now().toMillis()
     });
   } catch (error) {
