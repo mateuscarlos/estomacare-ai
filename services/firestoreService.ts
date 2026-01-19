@@ -15,7 +15,6 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { deepClone } from '../utils/dataUtils';
 import { Patient, Lesion, Assessment } from '../types';
 import { deepCloneAndStripUndefined } from '../utils';
 
@@ -268,10 +267,12 @@ export const updateLesion = async (lesionId: string, lesionData: Partial<Lesion>
     const lesionRef = doc(db, 'lesions', lesionId);
     // Remove id, patientId and assessments from updates - assessments are handled in sub-collection
     const { id, patientId, assessments, ...cleanData } = lesionData as any;
-    const serializedData = JSON.parse(JSON.stringify(cleanData));
+    
+    // Deep clone and strip undefined to ensure everything is serializable
+    const serializedData = deepCloneAndStripUndefined(cleanData);
     
     await updateDoc(lesionRef, {
-      ...deepClone(cleanData),
+      ...serializedData,
       updatedAt: Timestamp.now().toMillis()
     });
   } catch (error) {
