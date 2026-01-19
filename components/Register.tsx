@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Activity, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/firebaseAuthService';
+import { analyticsService } from '../services/analyticsService';
 import { User } from '../types';
 
 interface RegisterProps {
@@ -37,6 +38,8 @@ const Register: React.FC<RegisterProps> = ({ onLogin }) => {
 
     try {
       const user = await authService.register(name, email, password);
+      analyticsService.logSignUp('email');
+      analyticsService.setUser(user.uid);
       onLogin(user);
       navigate('/');
     } catch (err: any) {
@@ -51,6 +54,8 @@ const Register: React.FC<RegisterProps> = ({ onLogin }) => {
     setError('');
     try {
         const user = await authService.loginWithGoogle();
+        analyticsService.logSignUp('google');
+        analyticsService.setUser(user.uid);
         onLogin(user);
         navigate('/');
     } catch (err: any) {
