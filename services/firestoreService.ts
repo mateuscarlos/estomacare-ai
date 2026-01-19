@@ -13,6 +13,7 @@ import {
   Timestamp 
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { deepClone } from '../utils/dataUtils';
 import { Patient, Lesion, Assessment } from '../types';
 
 /**
@@ -122,8 +123,7 @@ export const updatePatient = async (patientId: string, patientData: Partial<Pati
     // Remove id, userId, and lesions from patientData - these fields should never be updated
     const { id, userId, lesions, ...restData } = patientData as any;
     
-    // Deep clone via JSON to ensure everything is serializable
-    const cleanData = JSON.parse(JSON.stringify(restData));
+    const cleanData = deepClone(restData);
     
     console.log('Updating patient in Firestore:', {
       patientId,
@@ -228,10 +228,9 @@ export const updateLesion = async (lesionId: string, lesionData: Partial<Lesion>
     const lesionRef = doc(db, 'lesions', lesionId);
     // Remove id and patientId from updates
     const { id, patientId, ...cleanData } = lesionData;
-    const serializedData = JSON.parse(JSON.stringify(cleanData));
     
     await updateDoc(lesionRef, {
-      ...serializedData,
+      ...deepClone(cleanData),
       updatedAt: Timestamp.now().toMillis()
     });
   } catch (error) {
