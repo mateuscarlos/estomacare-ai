@@ -193,6 +193,42 @@ export const getPatientLesions = async (patientId: string): Promise<Lesion[]> =>
 };
 
 /**
+ * Get all lesions for a list of patients (chunked to respect Firestore limits)
+ */
+export const getLesionsForPatients = async (patientIds: string[]): Promise<Lesion[]> => {
+  if (!patientIds.length) return [];
+
+  try {
+    const lesionsRef = collection(db, 'lesions');
+    const chunks = [];
+    // Firestore 'in' query limit is 30
+    const chunkSize = 30;
+
+    for (let i = 0; i < patientIds.length; i += chunkSize) {
+      chunks.push(patientIds.slice(i, i + chunkSize));
+    }
+
+    const lesionPromises = chunks.map(async (chunk) => {
+      const q = query(
+        lesionsRef,
+        where('patientId', 'in', chunk)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Lesion));
+    });
+
+    const results = await Promise.all(lesionPromises);
+    return results.flat();
+  } catch (error) {
+    console.error('Error fetching lesions for patients:', error);
+    return [];
+  }
+};
+
+/**
  * Create a new lesion for a patient
  */
 export const createLesion = async (patientId: string, lesionData: Omit<Lesion, 'id' | 'patientId'>): Promise<Lesion> => {
