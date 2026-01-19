@@ -5,6 +5,13 @@ import { useNavigate } from 'react-router-dom';
 import PatientFormModal from './PatientFormModal';
 import { getUserPatients, createPatient } from '../services/firestoreService';
 
+import React, { useState, useEffect } from 'react';
+import { Users, Activity, AlertCircle, Search, Plus, X, ChevronRight } from 'lucide-react';
+import { Patient, LesionType } from '../types';
+import { useNavigate } from 'react-router-dom';
+import PatientFormModal from './PatientFormModal';
+import { getLesionsForPatients } from '../services/firestoreService';
+
 interface DashboardProps {
   user: User;
 }
@@ -47,9 +54,40 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
   // Stats Logic
   const totalPatients = patients.length;
-  // TODO: Implement totalLesions and activeAlerts by querying lesions collection
-  const totalLesions = 0; // Will be implemented with separate query
-  const activeAlerts = 0; // Will be implemented with separate query
+  const [totalLesions, setTotalLesions] = useState(0);
+  const [activeAlerts, setActiveAlerts] = useState(0);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (patients.length === 0) {
+        setTotalLesions(0);
+        setActiveAlerts(0);
+        return;
+      }
+
+      const patientIds = patients.map(p => p.id);
+      const lesions = await getLesionsForPatients(patientIds);
+
+      setTotalLesions(lesions.length);
+
+      const alerts = lesions.filter(lesion => {
+        // Check latest assessment for alerts
+        if (!lesion.assessments || lesion.assessments.length === 0) return false;
+
+        const latestAssessment = lesion.assessments[lesion.assessments.length - 1];
+
+        // Alert conditions: Pain >= 8 OR Infection signs present
+        const hasHighPain = latestAssessment.painLevel >= 8;
+        const hasInfection = latestAssessment.infectionSigns && latestAssessment.infectionSigns.length > 0;
+
+        return hasHighPain || hasInfection;
+      }).length;
+
+      setActiveAlerts(alerts);
+    };
+
+    fetchStats();
+  }, [patients]);
 
   // Search Logic
   const filteredPatients = patients.filter(p => 

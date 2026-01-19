@@ -12,7 +12,15 @@ import {
 import { getTreatmentSuggestion, analyzeWoundImage } from '../services/firebaseGeminiService';
 import { analyticsService } from '../services/analyticsService';
 import { generateLesionPDF } from '../services/pdfService';
-import { getPatientLesions, createLesion, updateLesion, deleteLesion, getPatient, updatePatient as updatePatientInDb } from '../services/firestoreService';
+import {
+  getPatientLesions,
+  createLesion,
+  updateLesion,
+  deleteLesion,
+  addAssessment,
+  updateAssessment,
+  getLesionAssessments
+} from '../services/firestoreService';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
@@ -32,6 +40,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
   // State for lesions from separate collection
   const [lesions, setLesions] = useState<Lesion[]>([]);
   const [loadingLesions, setLoadingLesions] = useState(true);
+  const [loadingAssessments, setLoadingAssessments] = useState(false);
   
   const [activeLesionId, setActiveLesionId] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -145,6 +154,35 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
 
   const activeLesion = lesions.find(l => l.id === activeLesionId);
 
+  // Load assessments for the active lesion if needed
+  useEffect(() => {
+    const loadAssessments = async () => {
+      if (!activeLesionId) return;
+
+      // Find the lesion to check if we need to load or refresh
+      // We'll load every time activeLesionId changes to ensure we get the sub-collection data
+      // and trigger any necessary migration.
+      try {
+        setLoadingAssessments(true);
+        const assessments = await getLesionAssessments(activeLesionId);
+
+        setLesions(prevLesions =>
+          prevLesions.map(l =>
+            l.id === activeLesionId
+              ? { ...l, assessments: assessments }
+              : l
+          )
+        );
+      } catch (error) {
+        console.error("Error loading assessments", error);
+      } finally {
+        setLoadingAssessments(false);
+      }
+    };
+
+    loadAssessments();
+  }, [activeLesionId]);
+
   // Filter assessments that have AI suggestions for the consolidated history view
   const assessmentsWithSuggestions = activeLesion 
     ? [...activeLesion.assessments].filter(a => a.aiSuggestion).reverse()
@@ -169,16 +207,16 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
       
       const suggestion = await getTreatmentSuggestion(lesion, lastAssessment, patientContext);
       
-      const updatedAssessments = [...lesion.assessments];
-      updatedAssessments[updatedAssessments.length - 1] = {
+      const updatedAssessment = {
         ...lastAssessment,
         aiSuggestion: suggestion
       };
 
+      const updatedAssessments = [...lesion.assessments];
+      updatedAssessments[updatedAssessments.length - 1] = updatedAssessment;
+
       // Update lesion in Firestore
-      await updateLesion(lesion.id, {
-        assessments: updatedAssessments
-      });
+      await updateAssessment(lesion.id, updatedAssessment);
       
       // Update local state
       setLesions(lesions.map(l => l.id === lesion.id ? {...l, assessments: updatedAssessments} : l));
@@ -281,9 +319,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
 
     try {
       // Update lesion in Firestore
-      await updateLesion(activeLesion.id, {
-        assessments: updatedAssessments
-      });
+      await addAssessment(activeLesion.id, assessment);
       
       // Update local state
       setLesions(lesions.map(l => l.id === activeLesion.id ? {...l, assessments: updatedAssessments} : l));
