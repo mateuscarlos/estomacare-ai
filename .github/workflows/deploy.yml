@@ -105,7 +105,13 @@ jobs:
           echo "credentials_file_path=$HOME/gcloud-key.json" >> $GITHUB_OUTPUT
 
       - name: Deploy to Firebase Functions
-        run: npx firebase-tools@latest deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          PROJECT_ID="${{ secrets.VITE_FIREBASE_PROJECT_ID }}"
+          if [ -z "$PROJECT_ID" ]; then
+            echo "Error: VITE_FIREBASE_PROJECT_ID secret is not set"
+            exit 1
+          fi
+          npx firebase-tools@latest deploy --only functions --project "$PROJECT_ID"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
 
@@ -126,6 +132,12 @@ jobs:
           echo "credentials_file_path=$HOME/gcloud-key.json" >> $GITHUB_OUTPUT
 
       - name: Deploy Firestore Rules and Indexes
-        run:  npx firebase-tools@latest deploy --only firestore --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          PROJECT_ID="${{ secrets.VITE_FIREBASE_PROJECT_ID }}"
+          if [ -z "$PROJECT_ID" ]; then
+            echo "Error: VITE_FIREBASE_PROJECT_ID secret is not set"
+            exit 1
+          fi
+          npx firebase-tools@latest deploy --only firestore --project "$PROJECT_ID"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
