@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Patient, Lesion, Assessment } from '../types';
+import { deepCloneAndStripUndefined } from '../utils';
 
 /**
  * Get all patients for a specific user
@@ -124,8 +125,8 @@ export const updatePatient = async (patientId: string, patientData: Partial<Pati
     // Remove id, userId, and lesions from patientData - these fields should never be updated
     const { id, userId, lesions, ...restData } = patientData as any;
     
-    // Deep clone via JSON to ensure everything is serializable
-    const cleanData = JSON.parse(JSON.stringify(restData));
+    // Deep clone and strip undefined to ensure everything is serializable
+    const cleanData = deepCloneAndStripUndefined(restData);
     
     console.log('Updating patient in Firestore:', {
       patientId,
