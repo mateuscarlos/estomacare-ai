@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -8,7 +7,7 @@ import {
 } from 'lucide-react';
 import { 
   Patient, Lesion, Assessment, ExudateLevel, ExudateType, 
-  TissuePercentage, LesionType
+  TissuePercentage, LesionType, User
 } from '../types';
 import { getTreatmentSuggestion, analyzeWoundImage } from '../services/firebaseGeminiService';
 import { analyticsService } from '../services/analyticsService';
@@ -28,14 +27,15 @@ import {
 import PatientFormModal from './PatientFormModal';
 
 interface PatientDetailProps {
-  patients: Patient[];
-  onUpdatePatient: (updatedPatient: Patient) => void;
+  user: User;
 }
 
-const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient }) => {
+const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const patient = patients.find(p => p.id === id);
+
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [loadingPatient, setLoadingPatient] = useState(true);
 
   // State for lesions from separate collection
   const [lesions, setLesions] = useState<Lesion[]>([]);
@@ -88,6 +88,29 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
 
   const [newAssessment, setNewAssessment] = useState<Partial<Assessment>>(initialAssessmentState);
 
+  // Load patient
+  useEffect(() => {
+    const fetchPatient = async () => {
+      if (!id) return;
+      try {
+        setLoadingPatient(true);
+        const p = await getPatient(id);
+        if (p && p.userId === user.id) {
+            setPatient(p);
+        } else {
+            console.warn('Patient not found or unauthorized');
+            setPatient(null);
+        }
+      } catch (error) {
+        console.error("Error fetching patient", error);
+        setPatient(null);
+      } finally {
+        setLoadingPatient(false);
+      }
+    };
+    fetchPatient();
+  }, [id, user.id]);
+
   // Load lesions from Firestore when patient changes
   useEffect(() => {
     if (patient) {
@@ -115,7 +138,19 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
     }
   };
 
-  if (!patient) return <div>Paciente não encontrado</div>;
+  const handleUpdatePatient = async (updatedPatient: Patient) => {
+    if (!user) return;
+
+    try {
+      console.log('Updating patient:', updatedPatient.id);
+
+      await updatePatientInDb(updatedPatient.id, updatedPatient);
+      setPatient(updatedPatient);
+    } catch (error) {
+      console.error('Error updating patient:', error);
+      alert('Erro ao atualizar paciente: ' + (error as Error).message);
+    }
+  };
 
   const activeLesion = lesions.find(l => l.id === activeLesionId);
 
@@ -162,11 +197,11 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
     try {
       // Build a richer context string including allergies and history
       const patientContext = `
-        Paciente: ${patient.name} (${patient.age} anos, Gênero: ${patient.gender})
-        Nutrição: ${patient.nutritionalStatus || 'N/A'}
-        Mobilidade: ${patient.mobility || 'N/A'}
-        Comorbidades: ${patient.comorbidities.join(', ') || 'Nenhuma'}
-        Alergias Conhecidas: ${patient.allergies?.join(', ') || 'Nenhuma relatada'}
+        Paciente: ${patient!.name} (${patient!.age} anos, Gênero: ${patient!.gender})
+        Nutrição: ${patient!.nutritionalStatus || 'N/A'}
+        Mobilidade: ${patient!.mobility || 'N/A'}
+        Comorbidades: ${patient!.comorbidities.join(', ') || 'Nenhuma'}
+        Alergias Conhecidas: ${patient!.allergies?.join(', ') || 'Nenhuma relatada'}
         Tratamentos Anteriores nesta lesão: ${lesion.previousTreatments?.join(', ') || 'Não informado'}
       `;
       
@@ -303,6 +338,8 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
           return;
       }
 
+      if (!patient) return;
+
       const treatmentsArray = newLesionData.previousTreatments
           .split(',')
           .map(t => t.trim())
@@ -351,6 +388,16 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
   const infectionOptions = ['Calor local', 'Odor fétido', 'Edema', 'Eritema', 'Febre', 'Pus/Abscesso', 'Celulite'];
   const edgeOptions = ['Maceração', 'Desidratação', 'Deslocamento', 'Epíbole (Enrolada)'];
   const skinOptions = ['Maceração', 'Escoriação', 'Xerose (Seca)', 'Hiperqueratose', 'Calo', 'Eczema'];
+
+  if (loadingPatient) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="animate-spin text-primary-600" size={32} />
+        </div>
+      );
+  }
+
+  if (!patient) return <div>Paciente não encontrado</div>;
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
@@ -1093,7 +1140,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
       <PatientFormModal 
         isOpen={showEditPatientModal} 
         onClose={() => setShowEditPatientModal(false)} 
-        onSave={onUpdatePatient}
+        onSave={handleUpdatePatient}
         initialData={patient}
       />
     </div>
