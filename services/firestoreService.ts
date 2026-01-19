@@ -272,7 +272,7 @@ export const updateLesion = async (lesionId: string, lesionData: Partial<Lesion>
     const serializedData = deepCloneAndStripUndefined(cleanData);
     
     await updateDoc(lesionRef, {
-      ...serializedData,
+      ...deepCloneAndStripUndefined(cleanData),
       updatedAt: Timestamp.now().toMillis()
     });
   } catch (error) {
