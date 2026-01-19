@@ -40,39 +40,43 @@ export const rateLimiter = (config: RateLimitConfig = { maxRequests: 100, window
       
       const rateLimitDoc = db.collection('rateLimits').doc(userId);
       
-      await db.runTransaction(async (transaction) => {
-        const doc = await transaction.get(rateLimitDoc);
-        
-        if (!doc.exists) {
-          // First request
-          transaction.set(rateLimitDoc, {
-            requests: [now],
-            lastCleanup: now
-          });
-          return;
-        }
-        
-        const data = doc.data()!;
-        let requests: number[] = data.requests || [];
-        
-        // Remove old requests outside the window
-        requests = requests.filter(timestamp => timestamp > windowStart);
-        
-        if (requests.length >= config.maxRequests) {
-          throw new HttpsError(
-            'resource-exhausted',
-            `Limite de ${config.maxRequests} requisições por minuto excedido. Tente novamente em alguns instantes.`
-          );
-        }
-        
-        // Add new request
-        requests.push(now);
-        
-        transaction.update(rateLimitDoc, {
-          requests,
+      const doc = await rateLimitDoc.get();
+
+      if (!doc.exists) {
+        await rateLimitDoc.set({
+          requests: [now],
           lastCleanup: now
         });
-      });
+        return;
+      }
+
+      const data = doc.data()!;
+      const requests: number[] = data.requests || [];
+
+      // Filter locally to check limit
+      const activeRequests = requests.filter(timestamp => timestamp > windowStart);
+
+      if (activeRequests.length >= config.maxRequests) {
+        throw new HttpsError(
+          'resource-exhausted',
+          `Limite de ${config.maxRequests} requisições por minuto excedido. Tente novamente em alguns instantes.`
+        );
+      }
+
+      // Cleanup strategy: if array is too big (e.g. 2x limit), overwrite it
+      if (requests.length > config.maxRequests * 2) {
+        activeRequests.push(now);
+        await rateLimitDoc.update({
+          requests: activeRequests,
+          lastCleanup: now
+        });
+      } else {
+        // Optimized append using arrayUnion
+        await rateLimitDoc.update({
+          requests: admin.firestore.FieldValue.arrayUnion(now),
+          lastCleanup: now
+        });
+      }
     } catch (error: any) {
       if (error instanceof HttpsError && error.code === 'resource-exhausted') {
         // Throw rate limit errors

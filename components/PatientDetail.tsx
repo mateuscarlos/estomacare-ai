@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -8,30 +7,40 @@ import {
 } from 'lucide-react';
 import { 
   Patient, Lesion, Assessment, ExudateLevel, ExudateType, 
-  TissuePercentage, LesionType
+  TissuePercentage, LesionType, User
 } from '../types';
 import { getTreatmentSuggestion, analyzeWoundImage } from '../services/firebaseGeminiService';
 import { analyticsService } from '../services/analyticsService';
 import { generateLesionPDF } from '../services/pdfService';
-import { getPatientLesions, createLesion, updateLesion, deleteLesion } from '../services/firestoreService';
+import {
+  getPatientLesions,
+  createLesion,
+  updateLesion,
+  deleteLesion,
+  addAssessment,
+  updateAssessment,
+  getLesionAssessments
+} from '../services/firestoreService';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import PatientFormModal from './PatientFormModal';
 
 interface PatientDetailProps {
-  patients: Patient[];
-  onUpdatePatient: (updatedPatient: Patient) => void;
+  user: User;
 }
 
-const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient }) => {
+const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const patient = patients.find(p => p.id === id);
+
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [loadingPatient, setLoadingPatient] = useState(true);
 
   // State for lesions from separate collection
   const [lesions, setLesions] = useState<Lesion[]>([]);
   const [loadingLesions, setLoadingLesions] = useState(true);
+  const [loadingAssessments, setLoadingAssessments] = useState(false);
   
   const [activeLesionId, setActiveLesionId] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -79,6 +88,29 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
 
   const [newAssessment, setNewAssessment] = useState<Partial<Assessment>>(initialAssessmentState);
 
+  // Load patient
+  useEffect(() => {
+    const fetchPatient = async () => {
+      if (!id) return;
+      try {
+        setLoadingPatient(true);
+        const p = await getPatient(id);
+        if (p && p.userId === user.id) {
+            setPatient(p);
+        } else {
+            console.warn('Patient not found or unauthorized');
+            setPatient(null);
+        }
+      } catch (error) {
+        console.error("Error fetching patient", error);
+        setPatient(null);
+      } finally {
+        setLoadingPatient(false);
+      }
+    };
+    fetchPatient();
+  }, [id, user.id]);
+
   // Load lesions from Firestore when patient changes
   useEffect(() => {
     if (patient) {
@@ -106,9 +138,50 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
     }
   };
 
-  if (!patient) return <div>Paciente não encontrado</div>;
+  const handleUpdatePatient = async (updatedPatient: Patient) => {
+    if (!user) return;
+
+    try {
+      console.log('Updating patient:', updatedPatient.id);
+
+      await updatePatientInDb(updatedPatient.id, updatedPatient);
+      setPatient(updatedPatient);
+    } catch (error) {
+      console.error('Error updating patient:', error);
+      alert('Erro ao atualizar paciente: ' + (error as Error).message);
+    }
+  };
 
   const activeLesion = lesions.find(l => l.id === activeLesionId);
+
+  // Load assessments for the active lesion if needed
+  useEffect(() => {
+    const loadAssessments = async () => {
+      if (!activeLesionId) return;
+
+      // Find the lesion to check if we need to load or refresh
+      // We'll load every time activeLesionId changes to ensure we get the sub-collection data
+      // and trigger any necessary migration.
+      try {
+        setLoadingAssessments(true);
+        const assessments = await getLesionAssessments(activeLesionId);
+
+        setLesions(prevLesions =>
+          prevLesions.map(l =>
+            l.id === activeLesionId
+              ? { ...l, assessments: assessments }
+              : l
+          )
+        );
+      } catch (error) {
+        console.error("Error loading assessments", error);
+      } finally {
+        setLoadingAssessments(false);
+      }
+    };
+
+    loadAssessments();
+  }, [activeLesionId]);
 
   // Filter assessments that have AI suggestions for the consolidated history view
   const assessmentsWithSuggestions = activeLesion 
@@ -124,26 +197,26 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
     try {
       // Build a richer context string including allergies and history
       const patientContext = `
-        Paciente: ${patient.name} (${patient.age} anos, Gênero: ${patient.gender})
-        Nutrição: ${patient.nutritionalStatus || 'N/A'}
-        Mobilidade: ${patient.mobility || 'N/A'}
-        Comorbidades: ${patient.comorbidities.join(', ') || 'Nenhuma'}
-        Alergias Conhecidas: ${patient.allergies?.join(', ') || 'Nenhuma relatada'}
+        Paciente: ${patient!.name} (${patient!.age} anos, Gênero: ${patient!.gender})
+        Nutrição: ${patient!.nutritionalStatus || 'N/A'}
+        Mobilidade: ${patient!.mobility || 'N/A'}
+        Comorbidades: ${patient!.comorbidities.join(', ') || 'Nenhuma'}
+        Alergias Conhecidas: ${patient!.allergies?.join(', ') || 'Nenhuma relatada'}
         Tratamentos Anteriores nesta lesão: ${lesion.previousTreatments?.join(', ') || 'Não informado'}
       `;
       
       const suggestion = await getTreatmentSuggestion(lesion, lastAssessment, patientContext);
       
-      const updatedAssessments = [...lesion.assessments];
-      updatedAssessments[updatedAssessments.length - 1] = {
+      const updatedAssessment = {
         ...lastAssessment,
         aiSuggestion: suggestion
       };
 
+      const updatedAssessments = [...lesion.assessments];
+      updatedAssessments[updatedAssessments.length - 1] = updatedAssessment;
+
       // Update lesion in Firestore
-      await updateLesion(lesion.id, {
-        assessments: updatedAssessments
-      });
+      await updateAssessment(lesion.id, updatedAssessment);
       
       // Update local state
       setLesions(lesions.map(l => l.id === lesion.id ? {...l, assessments: updatedAssessments} : l));
@@ -246,9 +319,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
 
     try {
       // Update lesion in Firestore
-      await updateLesion(activeLesion.id, {
-        assessments: updatedAssessments
-      });
+      await addAssessment(activeLesion.id, assessment);
       
       // Update local state
       setLesions(lesions.map(l => l.id === activeLesion.id ? {...l, assessments: updatedAssessments} : l));
@@ -266,6 +337,8 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
           alert("Por favor, informe a localização da lesão.");
           return;
       }
+
+      if (!patient) return;
 
       const treatmentsArray = newLesionData.previousTreatments
           .split(',')
@@ -315,6 +388,16 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
   const infectionOptions = ['Calor local', 'Odor fétido', 'Edema', 'Eritema', 'Febre', 'Pus/Abscesso', 'Celulite'];
   const edgeOptions = ['Maceração', 'Desidratação', 'Deslocamento', 'Epíbole (Enrolada)'];
   const skinOptions = ['Maceração', 'Escoriação', 'Xerose (Seca)', 'Hiperqueratose', 'Calo', 'Eczema'];
+
+  if (loadingPatient) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="animate-spin text-primary-600" size={32} />
+        </div>
+      );
+  }
+
+  if (!patient) return <div>Paciente não encontrado</div>;
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
@@ -1057,7 +1140,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patients, onUpdatePatient
       <PatientFormModal 
         isOpen={showEditPatientModal} 
         onClose={() => setShowEditPatientModal(false)} 
-        onSave={onUpdatePatient}
+        onSave={handleUpdatePatient}
         initialData={patient}
       />
     </div>
