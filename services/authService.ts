@@ -1,6 +1,12 @@
 
 import { User } from '../types';
 
+// ⚠️ SECURITY WARNING:
+// This is a MOCK authentication service for testing and benchmarking only.
+// It stores passwords in plain text in LocalStorage.
+// DO NOT USE IN PRODUCTION. Use firebaseAuthService.ts instead.
+// ⚠️⚠️⚠️
+
 // Simulating a database in LocalStorage
 const USERS_KEY = 'estomacare_users';
 const CURRENT_USER_KEY = 'estomacare_current_user';
