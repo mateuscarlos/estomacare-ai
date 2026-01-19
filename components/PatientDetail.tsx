@@ -184,9 +184,10 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
   }, [activeLesionId]);
 
   // Filter assessments that have AI suggestions for the consolidated history view
-  const assessmentsWithSuggestions = activeLesion 
+  // Memoized to avoid unnecessary filtering/reversing on every render
+  const assessmentsWithSuggestions = useMemo(() => activeLesion
     ? [...activeLesion.assessments].filter(a => a.aiSuggestion).reverse()
-    : [];
+    : [], [activeLesion]);
 
   const handleAIAnalysis = async (lesion: Lesion) => {
     const lastAssessment = lesion.assessments[lesion.assessments.length - 1];
