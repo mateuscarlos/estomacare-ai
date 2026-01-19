@@ -43,14 +43,6 @@ const App: React.FC = () => {
 
   const handleLogin = async (loggedInUser: User) => {
     setUser(loggedInUser);
-    try {
-      // Load real patients from Firestore
-      const userPatients = await getUserPatients(loggedInUser.id);
-      setPatients(userPatients);
-    } catch (error) {
-      console.error('Error loading patients:', error);
-      setPatients([]);
-    }
   };
 
   const handleLogout = async () => {
