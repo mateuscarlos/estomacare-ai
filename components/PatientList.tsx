@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useDeferredValue } from 'react';
 import { Search, Plus, ChevronRight, X } from 'lucide-react';
 import { Patient } from '../types';
 import { useNavigate } from 'react-router-dom';
@@ -11,12 +11,13 @@ interface PatientListProps {
 
 const PatientList: React.FC<PatientListProps> = ({ patients, onAddPatient }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const navigate = useNavigate();
 
-  const filteredPatients = patients.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.id.includes(searchTerm)
-  );
+  const filteredPatients = useMemo(() => patients.filter(p =>
+    p.name.toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
+    p.id.includes(deferredSearchTerm)
+  ), [patients, deferredSearchTerm]);
 
   return (
     <div className="space-y-6">
