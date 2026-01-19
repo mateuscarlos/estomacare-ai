@@ -7,9 +7,6 @@ const CURRENT_USER_KEY = 'estomacare_current_user';
 
 export const authService = {
   login: async (email: string, password: string): Promise<User> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-
     const usersStr = localStorage.getItem(USERS_KEY);
     const users = usersStr ? JSON.parse(usersStr) : [];
     
