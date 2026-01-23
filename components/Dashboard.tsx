@@ -1,16 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Users, Activity, AlertCircle, Search, Plus, X, ChevronRight, Loader2 } from 'lucide-react';
 import { Patient, LesionType, User } from '../types';
 import { useNavigate } from 'react-router-dom';
 import PatientFormModal from './PatientFormModal';
-import { getUserPatients, createPatient } from '../services/firestoreService';
-
-import React, { useState, useEffect, useMemo } from 'react';
-import { Users, Activity, AlertCircle, Search, Plus, X, ChevronRight } from 'lucide-react';
-import { Patient, LesionType } from '../types';
-import { useNavigate } from 'react-router-dom';
-import PatientFormModal from './PatientFormModal';
-import { getLesionsForPatients } from '../services/firestoreService';
+import { getUserPatients, createPatient, getLesionsForPatients } from '../services/firestoreService';
 
 interface DashboardProps {
   user: User;
