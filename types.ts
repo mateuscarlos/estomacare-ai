@@ -73,6 +73,7 @@ export interface Lesion {
   startDate: string;
   previousTreatments?: string[]; // Histórico de tratamentos anteriores nesta lesão
   assessments: Assessment[];
+  latestAssessment?: Assessment; // Denormalized latest assessment for performance
 }
 
 export interface User {
