@@ -292,12 +292,13 @@ export const addAssessment = async (lesionId: string, assessment: Assessment): P
       : doc(assessmentsRef);
 
     const { id, ...assessmentData } = assessment;
+    const finalAssessment = {
+      ...assessmentData,
+      id: docRef.id,
+      updatedAt: Timestamp.now().toMillis()
+    };
 
-    await setDoc(docRef, {
-        ...assessmentData,
-        id: docRef.id,
-        updatedAt: Timestamp.now().toMillis()
-    });
+    await setDoc(docRef, finalAssessment);
 
     // Also update the lesion's updatedAt and latestAssessment
     await updateDoc(doc(db, 'lesions', lesionId), {
@@ -320,11 +321,25 @@ export const updateAssessment = async (lesionId: string, assessment: Assessment)
   try {
     const assessmentRef = doc(db, 'lesions', lesionId, 'assessments', assessment.id);
     const { id, ...data } = assessment;
-
-    await updateDoc(assessmentRef, {
+    const updatedAssessment = {
       ...data,
       updatedAt: Timestamp.now().toMillis()
-    });
+    };
+
+    await updateDoc(assessmentRef, updatedAssessment);
+
+    // Check if this is the latest assessment and update parent if so
+    const lesionRef = doc(db, 'lesions', lesionId);
+    const lesionDoc = await getDoc(lesionRef);
+    if (lesionDoc.exists()) {
+      const lesionData = lesionDoc.data() as Lesion;
+      // If the updated assessment is the one currently stored as latest, update it
+      if (lesionData.latestAssessment?.id === assessment.id) {
+        await updateDoc(lesionRef, {
+          latestAssessment: { ...updatedAssessment, id: assessment.id }
+        });
+      }
+    }
   } catch (error) {
     console.error('Error updating assessment:', error);
     throw new Error('Erro ao atualizar avaliação');
