@@ -27,7 +27,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     try {
       const user = await authService.login(email, password);
       analyticsService.logLogin('email');
-      analyticsService.setUser(user.uid);
+      analyticsService.setUser(user.id);
       onLogin(user);
       navigate('/');
     } catch (err: any) {
@@ -43,7 +43,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     try {
         const user = await authService.loginWithGoogle();
         analyticsService.logLogin('google');
-        analyticsService.setUser(user.uid);
+        analyticsService.setUser(user.id);
         onLogin(user);
         navigate('/');
     } catch (err: any) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Plus, Brain, Calendar, Activity, 
@@ -13,6 +13,8 @@ import { getTreatmentSuggestion, analyzeWoundImage } from '../services/firebaseG
 import { analyticsService } from '../services/analyticsService';
 import { generateLesionPDF } from '../services/pdfService';
 import {
+  getPatient,
+  updatePatient,
   getPatientLesions,
   createLesion,
   updateLesion,
@@ -144,7 +146,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
     try {
       console.log('Updating patient:', updatedPatient.id);
 
-      await updatePatientInDb(updatedPatient.id, updatedPatient);
+      await updatePatient(updatedPatient.id, updatedPatient);
       setPatient(updatedPatient);
     } catch (error) {
       console.error('Error updating patient:', error);

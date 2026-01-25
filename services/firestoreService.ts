@@ -299,9 +299,10 @@ export const addAssessment = async (lesionId: string, assessment: Assessment): P
         updatedAt: Timestamp.now().toMillis()
     });
 
-    // Also update the lesion's updatedAt
+    // Also update the lesion's updatedAt and latestAssessment
     await updateDoc(doc(db, 'lesions', lesionId), {
-      updatedAt: Timestamp.now().toMillis()
+      updatedAt: Timestamp.now().toMillis(),
+      latestAssessment: { ...assessmentData, id: docRef.id }
     });
   } catch (error) {
     console.error('Error adding assessment:', error);
@@ -321,6 +322,30 @@ export const updateAssessment = async (lesionId: string, assessment: Assessment)
       ...data,
       updatedAt: Timestamp.now().toMillis()
     });
+
+    // Update parent latestAssessment if necessary
+    const lesionRef = doc(db, 'lesions', lesionId);
+    const lesionDoc = await getDoc(lesionRef);
+
+    if (lesionDoc.exists()) {
+      const lesion = lesionDoc.data() as Lesion;
+      const currentLatest = lesion.latestAssessment;
+
+      // Update if:
+      // 1. No latest assessment exists
+      // 2. The updated assessment IS the latest assessment
+      // 3. The updated assessment is newer than the current latest
+      const shouldUpdate = !currentLatest ||
+                           currentLatest.id === assessment.id ||
+                           new Date(assessment.date) >= new Date(currentLatest.date);
+
+      if (shouldUpdate) {
+        await updateDoc(lesionRef, {
+          latestAssessment: assessment,
+          updatedAt: Timestamp.now().toMillis()
+        });
+      }
+    }
   } catch (error) {
     console.error('Error updating assessment:', error);
     throw new Error('Erro ao atualizar avaliação');
@@ -351,8 +376,14 @@ export const getLesionAssessments = async (lesionId: string): Promise<Assessment
         batch.set(assessmentDocRef, { ...data, id: assessment.id });
       });
 
-      // Update lesion to remove assessments array
-      batch.update(lesionRef, { assessments: [] });
+      // Find latest for denormalization
+      const latest = lesionData.assessments[lesionData.assessments.length - 1];
+
+      // Update lesion to remove assessments array and set latestAssessment
+      batch.update(lesionRef, {
+        assessments: [],
+        latestAssessment: latest
+      });
 
       await batch.commit();
       console.log('Migration complete.');
