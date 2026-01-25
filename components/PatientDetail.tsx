@@ -13,6 +13,8 @@ import { getTreatmentSuggestion, analyzeWoundImage } from '../services/firebaseG
 import { analyticsService } from '../services/analyticsService';
 import { generateLesionPDF } from '../services/pdfService';
 import {
+  getPatient,
+  updatePatient,
   getPatientLesions,
   createLesion,
   updateLesion,

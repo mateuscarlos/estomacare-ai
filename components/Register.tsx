@@ -39,7 +39,7 @@ const Register: React.FC<RegisterProps> = ({ onLogin }) => {
     try {
       const user = await authService.register(name, email, password);
       analyticsService.logSignUp('email');
-      analyticsService.setUser(user.uid);
+      analyticsService.setUser(user.id);
       onLogin(user);
       navigate('/');
     } catch (err: any) {
@@ -55,7 +55,7 @@ const Register: React.FC<RegisterProps> = ({ onLogin }) => {
     try {
         const user = await authService.loginWithGoogle();
         analyticsService.logSignUp('google');
-        analyticsService.setUser(user.uid);
+        analyticsService.setUser(user.id);
         onLogin(user);
         navigate('/');
     } catch (err: any) {

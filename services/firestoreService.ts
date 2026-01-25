@@ -370,8 +370,14 @@ export const getLesionAssessments = async (lesionId: string): Promise<Assessment
         batch.set(assessmentDocRef, { ...data, id: assessment.id });
       });
 
-      // Update lesion to remove assessments array
-      batch.update(lesionRef, { assessments: [] });
+      // Find latest for denormalization
+      const latest = lesionData.assessments[lesionData.assessments.length - 1];
+
+      // Update lesion to remove assessments array and set latestAssessment
+      batch.update(lesionRef, {
+        assessments: [],
+        latestAssessment: latest
+      });
 
       await batch.commit();
       console.log('Migration complete.');
