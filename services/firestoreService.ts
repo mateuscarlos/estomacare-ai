@@ -292,17 +292,21 @@ export const addAssessment = async (lesionId: string, assessment: Assessment): P
       : doc(assessmentsRef);
 
     const { id, ...assessmentData } = assessment;
+    const finalAssessment = {
+      ...assessmentData,
+      id: docRef.id,
+      updatedAt: Timestamp.now().toMillis()
+    };
 
-    await setDoc(docRef, {
-        ...assessmentData,
-        id: docRef.id,
-        updatedAt: Timestamp.now().toMillis()
-    });
+    await setDoc(docRef, finalAssessment);
 
     // Also update the lesion's updatedAt and latestAssessment
     await updateDoc(doc(db, 'lesions', lesionId), {
       updatedAt: Timestamp.now().toMillis(),
-      latestAssessment: { ...assessmentData, id: docRef.id }
+      latestAssessment: {
+        ...assessmentData,
+        id: docRef.id
+      }
     });
   } catch (error) {
     console.error('Error adding assessment:', error);
@@ -317,32 +321,22 @@ export const updateAssessment = async (lesionId: string, assessment: Assessment)
   try {
     const assessmentRef = doc(db, 'lesions', lesionId, 'assessments', assessment.id);
     const { id, ...data } = assessment;
-
-    await updateDoc(assessmentRef, {
+    const updatedAssessment = {
       ...data,
       updatedAt: Timestamp.now().toMillis()
-    });
+    };
 
-    // Update parent latestAssessment if necessary
+    await updateDoc(assessmentRef, updatedAssessment);
+
+    // Check if this is the latest assessment and update parent if so
     const lesionRef = doc(db, 'lesions', lesionId);
     const lesionDoc = await getDoc(lesionRef);
-
     if (lesionDoc.exists()) {
-      const lesion = lesionDoc.data() as Lesion;
-      const currentLatest = lesion.latestAssessment;
-
-      // Update if:
-      // 1. No latest assessment exists
-      // 2. The updated assessment IS the latest assessment
-      // 3. The updated assessment is newer than the current latest
-      const shouldUpdate = !currentLatest ||
-                           currentLatest.id === assessment.id ||
-                           new Date(assessment.date) >= new Date(currentLatest.date);
-
-      if (shouldUpdate) {
+      const lesionData = lesionDoc.data() as Lesion;
+      // If the updated assessment is the one currently stored as latest, update it
+      if (lesionData.latestAssessment?.id === assessment.id) {
         await updateDoc(lesionRef, {
-          latestAssessment: assessment,
-          updatedAt: Timestamp.now().toMillis()
+          latestAssessment: { ...updatedAssessment, id: assessment.id }
         });
       }
     }

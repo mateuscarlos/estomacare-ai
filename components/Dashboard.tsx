@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Users, Activity, AlertCircle, Search, Plus, X, ChevronRight, Loader2 } from 'lucide-react';
-import { Patient, LesionType, User } from '../types';
+import { Patient, User } from '../types';
 import { useNavigate } from 'react-router-dom';
 import PatientFormModal from './PatientFormModal';
 import { getUserPatients, createPatient, getLesionsForPatients } from '../services/firestoreService';
@@ -8,6 +8,19 @@ import { getUserPatients, createPatient, getLesionsForPatients } from '../servic
 interface DashboardProps {
   user: User;
 }
+
+const StatCard = React.memo(({ title, value, icon, color, subtext }: any) => (
+  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-start justify-between hover:shadow-md transition-shadow">
+    <div>
+      <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
+      <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{value}</h3>
+      {subtext && <p className="text-xs text-gray-400 mt-2 font-medium">{subtext}</p>}
+    </div>
+    <div className={`p-3 rounded-xl ${color} bg-opacity-20`}>
+      {React.cloneElement(icon, { className: color.replace('bg-', 'text-').replace('50', '600') })}
+    </div>
+  </div>
+));
 
 const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const navigate = useNavigate();
@@ -64,8 +77,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       setTotalLesions(lesions.length);
 
       const alerts = lesions.filter(lesion => {
-        // Check latest assessment for alerts (use denormalized field if available, fallback to array)
-        const latestAssessment = lesion.latestAssessment || (lesion.assessments && lesion.assessments.length > 0 ? lesion.assessments[lesion.assessments.length - 1] : null);
+        // Check latest assessment for alerts
+        // Priority: Denormalized latestAssessment > Last item in assessments array > null
+        const latestAssessment = lesion.latestAssessment ||
+          (lesion.assessments && lesion.assessments.length > 0 ? lesion.assessments[lesion.assessments.length - 1] : null);
 
         if (!latestAssessment) return false;
 
@@ -87,19 +102,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.id.includes(searchTerm)
   ), [patients, searchTerm]);
-
-  const StatCard = ({ title, value, icon, color, subtext }: any) => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-start justify-between hover:shadow-md transition-shadow">
-      <div>
-        <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
-        <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{value}</h3>
-        {subtext && <p className="text-xs text-gray-400 mt-2 font-medium">{subtext}</p>}
-      </div>
-      <div className={`p-3 rounded-xl ${color} bg-opacity-20`}>
-        {React.cloneElement(icon, { className: color.replace('bg-', 'text-').replace('50', '600') })}
-      </div>
-    </div>
-  );
 
   if (isLoading) {
     return (
@@ -192,7 +194,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-100 shadow-sm">
-                    <img src={patient.photoUrl} alt={patient.name} className="w-full h-full object-cover" />
+                    <img src={patient.photoUrl} alt={patient.name} loading="lazy" className="w-full h-full object-cover" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 text-base group-hover:text-primary-600 transition-colors">
@@ -246,5 +248,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     </div>
   );
 };
+
+const StatCard = ({ title, value, icon, color, subtext }: any) => (
+  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-start justify-between hover:shadow-md transition-shadow">
+    <div>
+      <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
+      <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{value}</h3>
+      {subtext && <p className="text-xs text-gray-400 mt-2 font-medium">{subtext}</p>}
+    </div>
+    <div className={`p-3 rounded-xl ${color} bg-opacity-20`}>
+      {React.cloneElement(icon, { className: color.replace('bg-', 'text-').replace('50', '600') })}
+    </div>
+  </div>
+);
 
 export default Dashboard;
