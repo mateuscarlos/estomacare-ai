@@ -303,7 +303,10 @@ export const addAssessment = async (lesionId: string, assessment: Assessment): P
     // Also update the lesion's updatedAt and latestAssessment
     await updateDoc(doc(db, 'lesions', lesionId), {
       updatedAt: Timestamp.now().toMillis(),
-      latestAssessment: finalAssessment
+      latestAssessment: {
+        ...assessmentData,
+        id: docRef.id
+      }
     });
   } catch (error) {
     console.error('Error adding assessment:', error);

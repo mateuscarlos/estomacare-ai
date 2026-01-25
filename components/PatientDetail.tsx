@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Plus, Brain, Calendar, Activity, 
@@ -19,7 +19,9 @@ import {
   deleteLesion,
   addAssessment,
   updateAssessment,
-  getLesionAssessments
+  getLesionAssessments,
+  getPatient,
+  updatePatient
 } from '../services/firestoreService';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -144,7 +146,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
     try {
       console.log('Updating patient:', updatedPatient.id);
 
-      await updatePatientInDb(updatedPatient.id, updatedPatient);
+      await updatePatient(updatedPatient.id, updatedPatient);
       setPatient(updatedPatient);
     } catch (error) {
       console.error('Error updating patient:', error);
@@ -152,7 +154,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
     }
   };
 
-  const activeLesion = lesions.find(l => l.id === activeLesionId);
+  const activeLesion = useMemo(() => lesions.find(l => l.id === activeLesionId), [lesions, activeLesionId]);
 
   // Load assessments for the active lesion if needed
   useEffect(() => {
@@ -378,12 +380,16 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
       }
   };
 
-  const chartData = activeLesion?.assessments && activeLesion.assessments.length > 0
+  const chartData = useMemo(() => activeLesion?.assessments && activeLesion.assessments.length > 0
     ? activeLesion.assessments.map(a => ({
         date: new Date(a.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
         area: parseFloat((a.widthMm * a.heightMm).toFixed(1))
       }))
-    : [];
+    : [], [activeLesion]);
+
+  const sortedAssessments = useMemo(() => activeLesion
+    ? [...activeLesion.assessments].reverse()
+    : [], [activeLesion]);
 
   // Options lists based on PDF
   const infectionOptions = ['Calor local', 'Odor fétido', 'Edema', 'Eritema', 'Febre', 'Pus/Abscesso', 'Celulite'];
@@ -784,7 +790,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
                     <p className="text-xs text-gray-500 mt-1">Clique em uma avaliação para ver detalhes.</p>
                 </div>
                 <div className="divide-y divide-gray-100">
-                    {[...activeLesion.assessments].reverse().map((assessment, idx) => (
+                    {sortedAssessments.map((assessment, idx) => (
                         <div 
                             key={assessment.id} 
                             onClick={() => setViewingAssessment(assessment)}
