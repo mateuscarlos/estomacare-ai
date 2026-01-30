@@ -7,3 +7,6 @@
 ## 2024-05-24 - [Expensive Derived State in Large Components]
 **Learning:** In `PatientDetail.tsx`, typing in a form input caused the entire component to re-render, triggering expensive recalculations of chart data and assessment lists (spread + reverse).
 **Action:** Memoized derived state (`activeLesion`, `chartData`, `sortedAssessments`) using `useMemo`. This isolates the cost of these calculations from unrelated state updates like form typing, improving responsiveness.
+## 2024-05-25 - [Frontend List Rendering Optimization]
+**Learning:** Inline mapping of complex list items in `Dashboard.tsx` coupled with unstable event handlers caused unnecessary re-renders of the entire list when parent state changed.
+**Action:** Extracted list items to memoized components (`PatientListItem`) and wrapped handlers in `useCallback` to ensure reference stability, enabling `React.memo` to work effectively.
