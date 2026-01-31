@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import PatientFormModal from './PatientFormModal';
 import StatCard from './StatCard';
 import { getUserPatients, createPatient, getLesionsForPatients } from '../services/firestoreService';
+import StatCard from './StatCard';
 
 interface DashboardProps {
   user: User;
