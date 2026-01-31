@@ -21,9 +21,7 @@ import {
   deleteLesion,
   addAssessment,
   updateAssessment,
-  getLesionAssessments,
-  getPatient,
-  updatePatient
+  getLesionAssessments
 } from '../services/firestoreService';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
