@@ -1,17 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Camera, Save, User, MapPin, Activity, Pill, Cigarette, Wine } from 'lucide-react';
+import { X, Camera, Save, User, MapPin, Activity, Pill, Cigarette, Wine, Loader2 } from 'lucide-react';
 import { Patient } from '../types';
 import { analyticsService } from '../services/analyticsService';
+import { uploadPatientImage } from '../services/storageService';
 
 interface PatientFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (patient: Patient) => void;
+  onSave: (patient: Patient) => Promise<void> | void;
   initialData?: Patient | null;
+  userId: string;
 }
 
-const PatientFormModal: React.FC<PatientFormModalProps> = ({ isOpen, onClose, onSave, initialData }) => {
+const PatientFormModal: React.FC<PatientFormModalProps> = ({ isOpen, onClose, onSave, initialData, userId }) => {
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formData, setFormData] = useState<Partial<Patient>>({
     name: '',
     age: 0,
@@ -39,6 +43,7 @@ const PatientFormModal: React.FC<PatientFormModalProps> = ({ isOpen, onClose, on
       setFormData(initialData);
       setComorbiditiesStr(initialData.comorbidities.join(', '));
       setAllergiesStr(initialData.allergies?.join(', ') || '');
+      setSelectedFile(null);
     } else {
       // Reset for new patient
       setFormData({
@@ -60,12 +65,14 @@ const PatientFormModal: React.FC<PatientFormModalProps> = ({ isOpen, onClose, on
       });
       setComorbiditiesStr('');
       setAllergiesStr('');
+      setSelectedFile(null);
     }
   }, [initialData, isOpen]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, photoUrl: reader.result as string }));
@@ -74,16 +81,29 @@ const PatientFormModal: React.FC<PatientFormModalProps> = ({ isOpen, onClose, on
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
     
     // Process arrays
     const processedComorbidities = comorbiditiesStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
     const processedAllergies = allergiesStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
 
+    let finalPhotoUrl = formData.photoUrl;
+
+    if (selectedFile) {
+      try {
+        finalPhotoUrl = await uploadPatientImage(userId, selectedFile);
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        alert('Erro ao fazer upload da imagem. O paciente será salvo sem a nova foto.');
+        finalPhotoUrl = initialData?.photoUrl || '';
+      }
+    }
+
     const patientToSave: Patient = {
       id: initialData?.id || Date.now().toString(),
-      userId: initialData?.userId || '', // Set userId from initialData for edits, or empty for new (handled by parent)
+      userId: initialData?.userId || userId || '', // Prioritize initial data, then prop, then empty
       name: formData.name || 'Sem Nome',
       age: formData.age || 0,
       gender: formData.gender as 'M' | 'F' | 'Outro',
@@ -98,7 +118,7 @@ const PatientFormModal: React.FC<PatientFormModalProps> = ({ isOpen, onClose, on
       comorbidities: processedComorbidities,
       allergies: processedAllergies,
       medications: formData.medications,
-      photoUrl: formData.photoUrl || `https://ui-avatars.com/api/?name=${formData.name}&background=random`
+      photoUrl: finalPhotoUrl || `https://ui-avatars.com/api/?name=${formData.name}&background=random`
     };
 
     // Log analytics
@@ -108,8 +128,14 @@ const PatientFormModal: React.FC<PatientFormModalProps> = ({ isOpen, onClose, on
       analyticsService.logPatientCreated();
     }
 
-    onSave(patientToSave);
-    onClose();
+    try {
+      await onSave(patientToSave);
+      onClose();
+    } catch (error) {
+      console.error('Error saving patient:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -268,8 +294,22 @@ const PatientFormModal: React.FC<PatientFormModalProps> = ({ isOpen, onClose, on
             <button type="button" onClick={onClose} className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-white transition-colors">
               Cancelar
             </button>
-            <button type="submit" className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium shadow-sm flex items-center">
-              <Save size={18} className="mr-2" /> {initialData ? 'Salvar Alterações' : 'Cadastrar Paciente'}
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium shadow-sm flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 size={18} className="mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save size={18} className="mr-2" />
+                  {initialData ? 'Salvar Alterações' : 'Cadastrar Paciente'}
+                </>
+              )}
             </button>
           </div>
 
