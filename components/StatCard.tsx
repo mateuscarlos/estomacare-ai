@@ -7,6 +7,7 @@ interface StatCardProps {
   Icon: LucideIcon;
   color: string;
   subtext?: string;
+  size?: number;
 }
 
 const StatCard: React.FC<StatCardProps> = memo(({ title, value, Icon, color, subtext }) => (
