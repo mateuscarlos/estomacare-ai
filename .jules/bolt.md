@@ -8,6 +8,6 @@
 **Learning:** In `PatientDetail.tsx`, typing in a form input caused the entire component to re-render, triggering expensive recalculations of chart data and assessment lists (spread + reverse).
 **Action:** Memoized derived state (`activeLesion`, `chartData`, `sortedAssessments`) using `useMemo`. This isolates the cost of these calculations from unrelated state updates like form typing, improving responsiveness.
 
-## 2024-05-24 - [React Memoization Broken by Inline Props]
-**Learning:** In `Dashboard.tsx`, `StatCard` was memoized but received a new `icon` element (e.g. `<Icon />`) on every render, defeating memoization and causing unnecessary re-renders.
-**Action:** Refactored `StatCard` to accept the component type (e.g. `Icon={Users}`) instead of an element. This ensures the prop reference remains stable across renders.
+## 2024-05-24 - [Broken Memoization via JSX Props]
+**Learning:** In `Dashboard.tsx`, `StatCard` was memoized but received `icon={<Users ... />}`. This creates a new object on every render, bypassing `React.memo`.
+**Action:** Pass component references (e.g., `Icon={Users}`) instead of instantiated elements to props of memoized components to ensure reference stability.
