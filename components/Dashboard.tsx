@@ -3,6 +3,7 @@ import { Users, Activity, AlertCircle, Search, Plus, X, ChevronRight, Loader2 } 
 import { Patient, User } from '../types';
 import { useNavigate } from 'react-router-dom';
 import PatientFormModal from './PatientFormModal';
+import StatCard from './StatCard';
 import { getUserPatients, createPatient, getLesionsForPatients } from '../services/firestoreService';
 import StatCard from './StatCard';
 
@@ -122,21 +123,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         <StatCard 
           title="Total de Pacientes" 
           value={totalPatients} 
-          icon={Users}
+          Icon={Users}
           color="bg-blue-50"
           subtext="+2 essa semana"
         />
         <StatCard 
           title="Lesões Ativas" 
           value={totalLesions} 
-          icon={Activity}
+          Icon={Activity}
           color="bg-emerald-50"
           subtext="85% cicatrizando"
         />
         <StatCard 
           title="Casos Críticos" 
           value={activeAlerts} 
-          icon={AlertCircle}
+          Icon={AlertCircle}
           color="bg-red-50"
           subtext="Requerem atenção"
         />
