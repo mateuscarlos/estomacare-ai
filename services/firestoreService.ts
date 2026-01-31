@@ -12,7 +12,9 @@ import {
   where,
   orderBy,
   Timestamp,
-  writeBatch
+  writeBatch,
+  DocumentReference,
+  WriteBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Patient, Lesion, Assessment } from '../types';
@@ -150,16 +152,60 @@ export const updatePatient = async (patientId: string, patientData: Partial<Pati
  */
 export const deletePatient = async (patientId: string): Promise<void> => {
   try {
+    const batchArray: WriteBatch[] = [];
+    let currentBatch = writeBatch(db);
+    let operationCount = 0;
+    const MAX_BATCH_SIZE = 500;
+
+    const addToBatch = (docRef: DocumentReference) => {
+        currentBatch.delete(docRef);
+        operationCount++;
+        if (operationCount >= MAX_BATCH_SIZE) {
+            batchArray.push(currentBatch);
+            currentBatch = writeBatch(db);
+            operationCount = 0;
+        }
+    };
+
+    // 1. Delete patient
     const patientRef = doc(db, 'patients', patientId);
-    await deleteDoc(patientRef);
+    addToBatch(patientRef);
     
-    // Also delete associated lesions
+    // 2. Get lesions
     const lesionsRef = collection(db, 'lesions');
     const q = query(lesionsRef, where('patientId', '==', patientId));
-    const querySnapshot = await getDocs(q);
+    const lesionSnapshot = await getDocs(q);
     
-    const deletePromises = querySnapshot.docs.map(doc => deleteLesion(doc.id));
-    await Promise.all(deletePromises);
+    // 3. Get assessments for each lesion (parallel)
+    const assessmentPromises = lesionSnapshot.docs.map(async (lesionDoc) => {
+        const assessmentsRef = collection(db, 'lesions', lesionDoc.id, 'assessments');
+        const assessmentSnapshot = await getDocs(assessmentsRef);
+        return {
+            lesionDoc,
+            assessmentDocs: assessmentSnapshot.docs
+        };
+    });
+
+    const results = await Promise.all(assessmentPromises);
+
+    // 4. Add to batch
+    for (const result of results) {
+        // Add assessments
+        for (const assessmentDoc of result.assessmentDocs) {
+            addToBatch(assessmentDoc.ref);
+        }
+        // Add lesion
+        addToBatch(result.lesionDoc.ref);
+    }
+
+    // Push final batch
+    if (operationCount > 0) {
+        batchArray.push(currentBatch);
+    }
+
+    // 5. Commit all batches
+    await Promise.all(batchArray.map(b => b.commit()));
+
   } catch (error) {
     console.error('Error deleting patient:', error);
     throw new Error('Erro ao deletar paciente');
