@@ -3,9 +3,9 @@ import { Users, Activity, AlertCircle, Search, Plus, X, Loader2 } from 'lucide-r
 import { Patient, User } from '../types';
 import { useNavigate } from 'react-router-dom';
 import PatientFormModal from './PatientFormModal';
+import StatCard from './StatCard';
 import { getUserPatients, createPatient, getLesionsForPatients } from '../services/firestoreService';
 import StatCard from './StatCard';
-import PatientListItem from './PatientListItem';
 
 interface DashboardProps {
   user: User;
@@ -47,8 +47,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     }
   };
 
-  const handlePatientClick = useCallback((id: string) => {
-    navigate(`/patients/${id}`);
+  const handlePatientClick = useCallback((patientId: string) => {
+    navigate(`/patients/${patientId}`);
   }, [navigate]);
 
   // Stats Logic
@@ -127,21 +127,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         <StatCard 
           title="Total de Pacientes" 
           value={totalPatients} 
-          icon={<Users size={24} />} 
+          Icon={Users}
           color="bg-blue-50"
           subtext="+2 essa semana"
         />
         <StatCard 
           title="Lesões Ativas" 
           value={totalLesions} 
-          icon={<Activity size={24} />} 
+          Icon={Activity}
           color="bg-emerald-50"
           subtext="85% cicatrizando"
         />
         <StatCard 
           title="Casos Críticos" 
           value={activeAlerts} 
-          icon={<AlertCircle size={24} />} 
+          Icon={AlertCircle}
           color="bg-red-50"
           subtext="Requerem atenção"
         />

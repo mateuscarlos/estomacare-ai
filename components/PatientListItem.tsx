@@ -26,7 +26,7 @@ const PatientListItem: React.FC<PatientListItemProps> = memo(({ patient, onClick
             <span>{patient.age} anos</span>
             <span>•</span>
             <span className="text-gray-600">
-              {patient.age} anos • {patient.gender}
+              {patient.gender}
             </span>
           </div>
         </div>
