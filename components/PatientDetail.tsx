@@ -45,6 +45,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
   const [loadingAssessments, setLoadingAssessments] = useState(false);
   
   const [activeLesionId, setActiveLesionId] = useState<string | null>(null);
+  const [loadedLesionIds, setLoadedLesionIds] = useState<Set<string>>(new Set());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
   // State for new assessment form
@@ -127,6 +128,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
       setLoadingLesions(true);
       const patientLesions = await getPatientLesions(patient.id);
       setLesions(patientLesions);
+      setLoadedLesionIds(new Set());
       
       // Set active lesion to first one if none selected
       if (!activeLesionId && patientLesions.length > 0) {
@@ -161,6 +163,10 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
     const loadAssessments = async () => {
       if (!activeLesionId) return;
 
+      if (loadedLesionIds.has(activeLesionId)) {
+        return;
+      }
+
       // Find the lesion to check if we need to load or refresh
       // We'll load every time activeLesionId changes to ensure we get the sub-collection data
       // and trigger any necessary migration.
@@ -175,6 +181,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
               : l
           )
         );
+        setLoadedLesionIds(prev => new Set(prev).add(activeLesionId));
       } catch (error) {
         console.error("Error loading assessments", error);
       } finally {
@@ -183,7 +190,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
     };
 
     loadAssessments();
-  }, [activeLesionId]);
+  }, [activeLesionId, loadedLesionIds]);
 
   // Filter assessments that have AI suggestions for the consolidated history view
   // Memoized to avoid unnecessary filtering/reversing on every render
@@ -361,6 +368,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
         // Update local state
         setLesions([...lesions, createdLesion]);
         setActiveLesionId(createdLesion.id);
+        setLoadedLesionIds(prev => new Set(prev).add(createdLesion.id));
         setShowAddLesionModal(false);
         setNewLesionData({
             type: LesionType.PRESSURE_ULCER,
