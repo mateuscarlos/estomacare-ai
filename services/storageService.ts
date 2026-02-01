@@ -2,6 +2,7 @@
 import { 
   ref, 
   uploadString, 
+  uploadBytes,
   getDownloadURL, 
   deleteObject 
 } from 'firebase/storage';
@@ -73,7 +74,7 @@ export const deleteLesionImage = async (imageUrl: string): Promise<void> => {
  */
 export const uploadPatientImage = async (
   userId: string,
-  base64Image: string,
+  file: File | Blob,
   filename?: string
 ): Promise<string> => {
   try {
@@ -81,7 +82,7 @@ export const uploadPatientImage = async (
     const imagePath = `patients/${userId}/${imageName}`;
     
     const imageRef = ref(storage, imagePath);
-    await uploadString(imageRef, base64Image, 'data_url');
+    await uploadBytes(imageRef, file);
     
     const downloadURL = await getDownloadURL(imageRef);
     return downloadURL;

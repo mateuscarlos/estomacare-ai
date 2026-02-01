@@ -202,6 +202,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         isOpen={showNewPatientModal} 
         onClose={() => setShowNewPatientModal(false)} 
         onSave={handleAddPatient}
+        userId={user.id}
       />
     </div>
   );

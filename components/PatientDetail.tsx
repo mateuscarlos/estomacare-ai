@@ -1149,6 +1149,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
         onClose={() => setShowEditPatientModal(false)} 
         onSave={handleUpdatePatient}
         initialData={patient}
+        userId={user.id}
       />
     </div>
   );
