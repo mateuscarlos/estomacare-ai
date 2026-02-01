@@ -11,10 +11,7 @@ import {
   query, 
   where,
   orderBy,
-  Timestamp,
-  writeBatch,
-  DocumentReference,
-  WriteBatch
+  Timestamp
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Patient, Lesion, Assessment } from '../types';
@@ -397,38 +394,6 @@ export const updateAssessment = async (lesionId: string, assessment: Assessment)
  */
 export const getLesionAssessments = async (lesionId: string): Promise<Assessment[]> => {
   try {
-    const lesionRef = doc(db, 'lesions', lesionId);
-    const lesionDoc = await getDoc(lesionRef);
-
-    if (!lesionDoc.exists()) return [];
-
-    const lesionData = lesionDoc.data() as Lesion;
-
-    // MIGRATION LOGIC: Check if there are assessments in the main document
-    if (lesionData.assessments && Array.isArray(lesionData.assessments) && lesionData.assessments.length > 0) {
-      console.log(`Migrating ${lesionData.assessments.length} assessments for lesion ${lesionId}...`);
-      const batch = writeBatch(db);
-      const assessmentsRef = collection(db, 'lesions', lesionId, 'assessments');
-
-      lesionData.assessments.forEach(assessment => {
-        const assessmentDocRef = doc(assessmentsRef, assessment.id); // Use existing ID
-        const { id, ...data } = assessment;
-        batch.set(assessmentDocRef, { ...data, id: assessment.id });
-      });
-
-      // Find latest for denormalization
-      const latest = lesionData.assessments[lesionData.assessments.length - 1];
-
-      // Update lesion to remove assessments array and set latestAssessment
-      batch.update(lesionRef, {
-        assessments: [],
-        latestAssessment: latest
-      });
-
-      await batch.commit();
-      console.log('Migration complete.');
-    }
-
     // Fetch from sub-collection
     const assessmentsRef = collection(db, 'lesions', lesionId, 'assessments');
     const q = query(assessmentsRef, orderBy('date', 'asc'));

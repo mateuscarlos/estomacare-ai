@@ -21,9 +21,7 @@ import {
   deleteLesion,
   addAssessment,
   updateAssessment,
-  getLesionAssessments,
-  getPatient,
-  updatePatient
+  getLesionAssessments
 } from '../services/firestoreService';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -1151,6 +1149,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ user }) => {
         onClose={() => setShowEditPatientModal(false)} 
         onSave={handleUpdatePatient}
         initialData={patient}
+        userId={user.id}
       />
     </div>
   );
