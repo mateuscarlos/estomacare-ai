@@ -3,9 +3,9 @@ import { Users, Activity, AlertCircle, Search, Plus, X, Loader2 } from 'lucide-r
 import { Patient, User } from '../types';
 import { useNavigate } from 'react-router-dom';
 import PatientFormModal from './PatientFormModal';
+import PatientListItem from './PatientListItem';
 import StatCard from './StatCard';
 import { getUserPatients, createPatient, getLesionsForPatients } from '../services/firestoreService';
-import StatCard from './StatCard';
 
 interface DashboardProps {
   user: User;
