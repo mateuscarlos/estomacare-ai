@@ -11,3 +11,7 @@
 ## 2024-05-24 - [Broken Memoization via JSX Props]
 **Learning:** In `Dashboard.tsx`, `StatCard` was memoized but received `icon={<Users ... />}`. This creates a new object on every render, bypassing `React.memo`.
 **Action:** Pass component references (e.g., `Icon={Users}`) instead of instantiated elements to props of memoized components to ensure reference stability.
+
+## 2025-02-02 - [Heavy Dependency Isolation via Code Splitting]
+**Learning:** `PatientDetail` component imports heavy libraries (`recharts`, `jspdf`) totaling ~750kB, which were being bundled into the main entry point, delaying the initial load for all users (even those just logging in).
+**Action:** Implemented route-based code splitting using `React.lazy` and `Suspense` in `App.tsx`. This defers the loading of these heavy dependencies until the specific route is accessed.
