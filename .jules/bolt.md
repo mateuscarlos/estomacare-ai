@@ -11,3 +11,6 @@
 ## 2024-05-24 - [Broken Memoization via JSX Props]
 **Learning:** In `Dashboard.tsx`, `StatCard` was memoized but received `icon={<Users ... />}`. This creates a new object on every render, bypassing `React.memo`.
 **Action:** Pass component references (e.g., `Icon={Users}`) instead of instantiated elements to props of memoized components to ensure reference stability.
+## 2024-05-24 - [State Isolation for Form Performance]
+**Learning:** Typing in the assessment form within `PatientDetail.tsx` caused the entire component (including expensive charts and history lists) to re-render on every keystroke, leading to input lag.
+**Action:** Extracted the form state and UI into a separate `PatientAssessmentForm` component. This isolates the rapid state updates to the child component, preventing unnecessary re-renders of the heavy parent component.
