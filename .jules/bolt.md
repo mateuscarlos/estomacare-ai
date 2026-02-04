@@ -11,3 +11,7 @@
 ## 2024-05-24 - [Broken Memoization via JSX Props]
 **Learning:** In `Dashboard.tsx`, `StatCard` was memoized but received `icon={<Users ... />}`. This creates a new object on every render, bypassing `React.memo`.
 **Action:** Pass component references (e.g., `Icon={Users}`) instead of instantiated elements to props of memoized components to ensure reference stability.
+
+## 2024-05-24 - [Duplicate Fetching in Tabs]
+**Learning:** `PatientDetail` re-fetched assessment sub-collections every time the user switched tabs (lesions), causing redundant network requests and potential latency.
+**Action:** Implemented client-side caching using `loadedLesionIds` Set to track and skip fetches for already-loaded sub-collections.
