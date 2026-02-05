@@ -11,7 +11,10 @@ import {
   query, 
   where,
   orderBy,
-  Timestamp
+  Timestamp,
+  WriteBatch,
+  writeBatch,
+  DocumentReference
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Patient, Lesion, Assessment } from '../types';
