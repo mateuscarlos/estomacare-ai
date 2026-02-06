@@ -11,3 +11,7 @@
 ## 2024-05-24 - [Broken Memoization via JSX Props]
 **Learning:** In `Dashboard.tsx`, `StatCard` was memoized but received `icon={<Users ... />}`. This creates a new object on every render, bypassing `React.memo`.
 **Action:** Pass component references (e.g., `Icon={Users}`) instead of instantiated elements to props of memoized components to ensure reference stability.
+
+## 2026-02-06 - [Redundant Subcollection Reads]
+**Learning:** In `PatientDetail.tsx`, switching between lesions triggered a new Firestore read for assessments every time, even if already visited in the session.
+**Action:** Implemented a `loadedLesionIds` Set (state) to track and cache loaded assessments, preventing redundant network requests and improving UI responsiveness.
